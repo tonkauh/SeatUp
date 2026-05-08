@@ -135,32 +135,33 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   
         {/* 2. เมนูรายละเอียดการจอง (ขวา) */}
         <div className="w-full md:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-20 border-t md:border-t-0 md:border-l border-slate-200">
-          <div className="bg-slate-900 text-white p-3 md:p-6 text-sm md:text-lg font-black tracking-widest uppercase flex items-center gap-3 relative overflow-hidden shrink-0">
+          {/* ซ่อน Header BOOKING SUMMARY บนมือถือเพื่อประหยัดพื้นที่ */}
+          <div className="hidden md:flex bg-slate-900 text-white p-3 md:p-6 text-sm md:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
              <svg className="w-5 h-5 md:w-6 md:h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
              <span className="relative z-10">BOOKING SUMMARY</span>
           </div>
   
-          <div className="p-4 md:p-6 flex-grow flex flex-col justify-end md:justify-start">
-             <div className="flex justify-between items-center mb-4 md:mb-8 border-b md:border-b-0 pb-2 md:pb-0 md:space-y-4 md:flex-col md:items-stretch">
+          <div className="p-3 md:p-6 flex-grow flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-4 md:gap-0 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none relative z-30">
+             <div className="flex flex-row md:flex-col items-center md:items-stretch md:mb-8 md:space-y-4 shrink-0 md:w-full gap-2 md:gap-0">
                 <div className="hidden md:flex justify-between border-b pb-2">
                    <span className="text-slate-400">ห้องเรียน</span>
                    <span className="font-bold text-slate-900">{room?.name || 'กำลังโหลด...'}</span>
                 </div>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center md:border-b md:pb-2">
-                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold">โต๊ะที่เลือก</span>
-                   <span className="text-red-600 font-black text-lg md:text-xl">{selectedSeat || '-'}</span>
+                <div className="flex flex-row md:justify-between items-center md:border-b md:pb-2 gap-2 md:gap-0">
+                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
+                   <span className="text-red-600 font-black text-2xl md:text-xl leading-none">{selectedSeat || '-'}</span>
                 </div>
-                <div className="flex flex-col text-right md:text-left md:flex-row md:justify-between md:items-center md:pt-2">
-                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold">ชื่อผู้จอง</span>
-                   <span className="font-bold text-slate-900 text-sm md:text-base">{studentName || '-'}</span>
+                <div className="hidden md:flex flex-row justify-between items-center pt-2">
+                   <span className="text-sm text-slate-400 font-bold">ชื่อผู้จอง</span>
+                   <span className="font-bold text-slate-900 text-base">{studentName || '-'}</span>
                 </div>
              </div>
   
              <button 
                onClick={confirmBooking}
                disabled={showOverlay}
-               className="w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 md:py-4 rounded-lg font-bold text-base md:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0"
+               className="flex-1 md:w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 md:py-4 px-2 md:px-0 rounded-lg font-bold text-sm md:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 whitespace-nowrap"
              >
                {showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
              </button>
