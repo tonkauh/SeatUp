@@ -5,6 +5,7 @@ import { DialogProvider, useDialog } from '@/components/DialogContext';
 import AdminPanel from '@/components/AdminPanel';
 import RoomEditor from '@/components/RoomEditor';
 import { Prompt } from 'next/font/google';
+import { useRouter } from 'next/navigation';
 
 const prompt = Prompt({
   weight: ['300', '400', '500', '600', '700'],
@@ -13,12 +14,17 @@ const prompt = Prompt({
 });
 
 function PageContent() {
+  const router = useRouter();
   const [view, setView] = useState<'landing' | 'host_menu' | 'host_create' | 'host_manage' | 'editor' | 'join'>('landing');
   const [editingRoom, setEditingRoom] = useState<any>(null); // เก็บห้องที่กำลังแต่ง
   const [joinCode, setJoinCode] = useState('');
   const [studentNameForJoin, setStudentNameForJoin] = useState('');
   const [manageCode, setManageCode] = useState(''); // รหัสสำหรับเข้าดู Dashboard
   const { showAlert } = useDialog();
+  const [showDonation, setShowDonation] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
 
   const refetchEditingRoom = async () => {
     if (!editingRoom?.id) return;
@@ -32,6 +38,25 @@ function PageContent() {
   const handleRoomCreated = (room: any) => {
     setEditingRoom(room);
     setView('editor'); // สลับไปหน้าต่างจัดการ/Dashboard
+  };
+
+  // ฟังก์ชันส่ง Feedback ลง Supabase
+  const handleSubmitFeedback = async () => {
+    if (!feedbackText.trim()) return showAlert('กรุณาพิมพ์ข้อความก่อนส่งครับ');
+    setIsSubmittingFeedback(true);
+    try {
+      // บันทึกลงตาราง feedbacks
+      const { error } = await supabase.from('feedbacks').insert([{ message: feedbackText.trim() }]);
+      if (error) throw error;
+      
+      showAlert('ส่งข้อความสำเร็จ ขอบคุณสำหรับคำแนะนำครับ!');
+      setFeedbackText('');
+      setShowFeedback(false);
+    } catch (error: any) {
+      showAlert('เกิดข้อผิดพลาด: ' + error.message);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   if (view === 'landing') {
@@ -70,6 +95,84 @@ function PageContent() {
             <p className="text-slate-500 mt-2 font-medium">กรอกโค้ดเพื่อเข้าจองที่นั่ง</p>
           </button>
         </div>
+        
+        {/* Footer Links */}
+        <div className="mt-16 md:mt-24 flex flex-wrap items-center justify-center gap-4 text-sm font-bold text-slate-500">
+          <button onClick={() => setShowDonation(true)} className="flex items-center gap-2.5 px-5 py-2.5 bg-white border border-slate-200 rounded-full hover:border-amber-300 hover:text-amber-700 hover:shadow-sm hover:-translate-y-0.5 transition-all outline-none">
+            <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14h-3M14 20h6v-3M17 17h3" />
+            </svg>
+            เลี้ยงข้าวคนสร้าง
+          </button>
+          <button onClick={() => setShowFeedback(true)} className="flex items-center gap-2.5 px-5 py-2.5 bg-white border border-slate-200 rounded-full hover:border-indigo-300 hover:text-indigo-700 hover:shadow-sm hover:-translate-y-0.5 transition-all outline-none">
+            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            Feedback
+          </button>
+        </div>
+        
+        {/* Popup โดเนท */}
+        {showDonation && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setShowDonation(false)}>
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl max-w-sm w-full text-center relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowDonation(false)} className="absolute top-5 right-5 w-10 h-10 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors outline-none">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner transform -rotate-6">
+                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h3v3h-3zM20 14h-3M14 20h6v-3M17 17h3" /></svg>
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-wide">สแกนเพื่อเลี้ยงข้าว</h3>
+              <p className="text-slate-500 text-sm mb-6">สนับสนุนการพัฒนาและเป็นกำลังใจให้คนสร้าง</p>
+              
+              <div className="bg-white p-4 rounded-2xl border-2 border-slate-100 mb-6 inline-block shadow-sm">
+                {/* ดึงรูป QR Code มาแสดงโดยตรงเลย */}
+                <img src="https://promptpay.io/0807512918.png" alt="PromptPay QR" className="w-48 h-48 mx-auto" />
+              </div>
+              
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">ชื่อผู้รับเงิน (PromptPay)</p>
+                <p className="text-xl font-black text-slate-800">กิตติภณ มณีตัน</p>
+                <p className="text-sm font-bold text-slate-500 mt-1 font-mono">080-751-2918</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Popup ส่ง Feedback */}
+        {showFeedback && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300" onClick={() => setShowFeedback(false)}>
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full text-center relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowFeedback(false)} className="absolute top-5 right-5 w-10 h-10 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors outline-none">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              
+              <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner transform rotate-3">
+                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+              </div>
+              
+              <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-wide">ส่งคำแนะนำติชม</h3>
+              <p className="text-slate-500 text-sm mb-6">ข้อเสนอแนะของคุณจะช่วยให้เราพัฒนาระบบได้ดียิ่งขึ้น</p>
+              
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="พิมพ์ข้อความของคุณที่นี่..."
+                className="w-full h-32 p-4 mb-6 rounded-2xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-slate-50 outline-none resize-none text-sm md:text-base text-slate-700"
+              ></textarea>
+              
+              <button 
+                onClick={handleSubmitFeedback}
+                disabled={isSubmittingFeedback}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white py-4 rounded-xl font-bold uppercase transition-colors tracking-widest shadow-md shadow-indigo-600/20 disabled:shadow-none"
+              >
+                {isSubmittingFeedback ? 'กำลังส่ง...' : 'ส่งข้อความ'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -170,7 +273,7 @@ function PageContent() {
                 onClick={async () => {
                   if (!studentNameForJoin.trim()) return showAlert('กรุณากรอกชื่อ-นามสกุลของคุณก่อนครับ');
                   const { data } = await supabase.from('rooms').select('id').eq('join_code', joinCode).single();
-                  if (data) window.location.href = `/room/${data.id}?name=${encodeURIComponent(studentNameForJoin)}`;
+                  if (data) router.push(`/room/${data.id}?name=${encodeURIComponent(studentNameForJoin)}`);
                   else showAlert('ไม่พบรหัสห้องนี้ครับ');
                 }}
                 className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-bold text-lg uppercase transition-colors"

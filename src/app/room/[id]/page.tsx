@@ -1,20 +1,19 @@
 'use client'
 import { useEffect, useState, use } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
-import { DialogProvider } from '@/components/DialogContext';
+import { DialogProvider, useDialog } from '@/components/DialogContext';
 
 const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { 
   ssr: false,
   loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-800 text-slate-500">Loading Map...</div>
 });
 
-export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const roomId = resolvedParams.id;
-  const searchParams = useSearchParams();
-  const nameFromQuery = searchParams.get('name');
+// แยกเนื้อหาออกมาเพื่อสามารถเรียกใช้ useDialog ได้
+function BookingContent({ roomId, nameFromQuery }: { roomId: string, nameFromQuery: string | null }) {
+  const router = useRouter();
+  const { showAlert } = useDialog();
 
   const [room, setRoom] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -27,16 +26,38 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   const [timeLeft, setTimeLeft] = useState<{d: number, h: number, m: number, s: number} | null>(null);
 
   useEffect(() => {
+    let channel: any;
+
     const fetchData = async () => {
       const { data: roomData } = await supabase.from('rooms').select('*').or(`id.eq.${roomId},join_code.eq.${roomId.toUpperCase()}`).maybeSingle();
       if (roomData) {
         setRoom(roomData);
-        const { data: bookingData } = await supabase.from('bookings').select('desk_id, user_name').eq('room_id', roomData.id);
-        if (bookingData) setBookings(bookingData);
+
+        const fetchBookings = async () => {
+          // เพิ่ม id ลงไปในการดึงข้อมูล เพื่อใช้กรองเวลาข้อมูลถูกลบ (DELETE) แบบเรียลไทม์
+          const { data: bookingData } = await supabase.from('bookings').select('id, desk_id, user_name').eq('room_id', roomData.id);
+          if (bookingData) setBookings(bookingData);
+        };
+        await fetchBookings();
+
+        // ระบบดักจับ Real-time ยัดข้อมูลใส่ State เองโดยไม่ต้องดึงใหม่จากฐานข้อมูล
+        channel = supabase
+          .channel(`public:bookings:${roomData.id}-${Date.now()}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
+            setBookings(prev => [...prev, payload.new]); // นำคนจองใหม่ต่อท้ายได้เลย
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
+            setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
+          })
+          .subscribe();
       }
       setLoading(false);
     };
     fetchData();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [roomId]);
 
   // ระบบนับถอยหลัง
@@ -82,13 +103,13 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   };
 
   const confirmBooking = async () => {
-    if (!studentName.trim()) return alert('กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน');
-    if (!selectedSeat) return alert('กรุณาเลือกที่นั่งบนแผนผัง');
+    if (!studentName.trim()) return showAlert('กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน');
+    if (!selectedSeat) return showAlert('กรุณาเลือกที่นั่งบนแผนผัง');
 
     // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
     const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
     if (hasBooked) {
-      return alert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
+      return showAlert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
     }
 
     const { error } = await supabase.from('bookings').insert([{
@@ -97,17 +118,21 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
       user_name: studentName,
     }]);
 
-    if (error) alert('Error: ' + error.message);
-    else {
-      alert('จองที่นั่งสำเร็จ!');
-      window.location.reload();
+    if (error) {
+      if (error.code === '23505') { // รหัส Error 23505 = ข้อมูลซ้ำ (Unique Violation)
+        showAlert('ขออภัยครับ ที่นั่งนี้ถูกจองตัดหน้าไปแล้ว หรือคุณได้ทำการจองที่นั่งอื่นไปแล้วครับ');
+      } else {
+        showAlert('Error: ' + error.message);
+      }
+    } else {
+      showAlert('จองที่นั่งสำเร็จ!');
+      setSelectedSeat(null); // ไม่ต้องรีเฟรชหน้าจอแล้ว เพราะ Realtime จะอัปเดตแผนผังให้เอง
     }
   };
 
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">LOADING...</div>;
 
   return (
-    <DialogProvider>
       <div className="h-[100dvh] bg-slate-50 text-slate-900 flex flex-col md:flex-row overflow-hidden font-sans">
         
         {/* 1. ส่วนแผนผัง (ซ้าย) */}
@@ -136,25 +161,31 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
         {/* 2. เมนูรายละเอียดการจอง (ขวา) */}
         <div className="w-full md:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-20 border-t md:border-t-0 md:border-l border-slate-200">
           {/* ซ่อน Header BOOKING SUMMARY บนมือถือเพื่อประหยัดพื้นที่ */}
-          <div className="hidden md:flex bg-slate-900 text-white p-3 md:p-6 text-sm md:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
+          <div className="hidden md:flex bg-slate-900 text-white p-4 md:p-6 text-sm md:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
              <svg className="w-5 h-5 md:w-6 md:h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
              <span className="relative z-10">BOOKING SUMMARY</span>
           </div>
   
-          <div className="p-3 md:p-6 flex-grow flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-4 md:gap-0 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none relative z-30">
+          <div className="p-3 md:p-6 flex-grow flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-3 md:gap-0 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none relative z-30">
+             
+             {/* ปุ่ม Back สำหรับมือถือ แบบเล็กๆ */}
+             <button onClick={() => router.push('/')} className="md:hidden flex items-center justify-center p-3 text-slate-400 hover:text-slate-900 transition-colors bg-slate-100 rounded-lg shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+             </button>
+
              <div className="flex flex-row md:flex-col items-center md:items-stretch md:mb-8 md:space-y-4 shrink-0 md:w-full gap-2 md:gap-0">
                 <div className="hidden md:flex justify-between border-b pb-2">
                    <span className="text-slate-400">ห้องเรียน</span>
                    <span className="font-bold text-slate-900">{room?.name || 'กำลังโหลด...'}</span>
                 </div>
-                <div className="flex flex-row md:justify-between items-center md:border-b md:pb-2 gap-2 md:gap-0">
-                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
-                   <span className="text-red-600 font-black text-2xl md:text-xl leading-none">{selectedSeat || '-'}</span>
+                <div className="flex flex-col md:flex-row md:justify-between items-center md:border-b md:pb-2 gap-0.5 md:gap-0">
+                   <span className="text-[10px] md:text-sm text-slate-500 md:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
+                   <span className="text-red-600 font-black text-xl md:text-xl leading-none">{selectedSeat || '-'}</span>
                 </div>
-                <div className="hidden md:flex flex-row justify-between items-center pt-2">
-                   <span className="text-sm text-slate-400 font-bold">ชื่อผู้จอง</span>
-                   <span className="font-bold text-slate-900 text-base">{studentName || '-'}</span>
+                <div className="hidden md:flex flex-col text-right md:text-left md:flex-row md:justify-between md:items-center md:pt-2">
+                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold">ชื่อผู้จอง</span>
+                   <span className="font-bold text-slate-900 text-sm md:text-base">{studentName || '-'}</span>
                 </div>
              </div>
   
@@ -166,7 +197,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                {showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
              </button>
              
-             <button onClick={() => window.location.href = '/'} className="hidden md:flex mt-4 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
+             <button onClick={() => router.push('/')} className="hidden md:flex mt-4 py-3 md:py-0 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                 กลับหน้าหลัก
              </button>
@@ -197,6 +228,15 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
       </div>
-    </DialogProvider>
   );
+}
+
+export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  const searchParams = useSearchParams();
+  return (
+    <DialogProvider>
+      <BookingContent roomId={resolvedParams.id} nameFromQuery={searchParams.get('name')} />
+    </DialogProvider>
+  )
 }

@@ -30,6 +30,21 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
 
   useEffect(() => {
     fetchBookings();
+
+    // เปิดใช้งาน Supabase Realtime สำหรับหน้า Dashboard แอดมิน
+    const channel = supabase
+      .channel(`admin_bookings_${room.id}_${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
+        setBookings(prev => [payload.new, ...prev]); // นำคนจองใหม่แทรกขึ้นด้านบนสุด
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
+        setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบข้อมูลที่โดนยกเลิกออกทันที
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [room.id]);
 
   // แก้ไขตรงนี้: ปรับ parameter ให้เป็น any หรือ any[] เพื่อรับค่าจาก Canvas
