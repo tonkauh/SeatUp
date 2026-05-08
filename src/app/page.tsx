@@ -37,9 +37,15 @@ function PageContent() {
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-900">
-        <h1 className="text-6xl md:text-7xl font-black mb-12 tracking-tighter uppercase">
-          SEAT<span className="text-red-600 font-normal">UP</span>
-        </h1>
+        {/* Logo Section */}
+        <div className="flex items-center justify-center gap-4 mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-900 text-white rounded-2xl flex items-center justify-center transform -rotate-6 shadow-xl">
+            <svg className="w-10 h-10 md:w-12 md:h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4M5 10h14M7 10V5a2 2 0 012-2h6a2 2 0 012 2v5" /></svg>
+          </div>
+          <h1 className="text-6xl md:text-7xl font-black tracking-tighter uppercase">
+            SEAT<span className="text-red-600 font-normal">UP</span>
+          </h1>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
           <button 
