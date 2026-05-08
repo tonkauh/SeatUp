@@ -66,12 +66,20 @@ export default function ClassroomCanvas({
     return { x: (p1.clientX + p2.clientX) / 2, y: (p1.clientY + p2.clientY) / 2 };
   };
 
+  const handleTouchStart = (e: any) => {
+    if (e.evt.touches.length === 2) {
+      const touch1 = e.evt.touches[0];
+      const touch2 = e.evt.touches[1];
+      lastDist.current = getDistance(touch1, touch2);
+    }
+  };
+
   const handleTouchMove = (e: any) => {
     e.evt.preventDefault();
-    const touch1 = e.evt.touches[0];
-    const touch2 = e.evt.touches[1];
+    if (e.evt.touches.length === 2) {
+      const touch1 = e.evt.touches[0];
+      const touch2 = e.evt.touches[1];
 
-    if (touch1 && touch2) {
       const stage = e.target.getStage();
       if (stage.isDragging()) stage.stopDrag(); // หยุดลากกระดานเวลาจะซูม
 
@@ -208,13 +216,13 @@ export default function ClassroomCanvas({
   return (
     <div 
       ref={containerRef}
-      className="w-full flex-1 h-[65vh] md:h-auto md:min-h-[600px] bg-slate-50 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] rounded-none md:rounded-xl border-y md:border border-slate-200 overflow-hidden relative group"
+      className="w-full h-full min-h-[50vh] md:min-h-[600px] flex-1 bg-slate-50 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] rounded-none md:rounded-xl border-y md:border border-slate-200 overflow-hidden relative group"
       style={{ touchAction: 'none' }} // ป้องกันจอไหลตอนใช้นิ้วลากแผนผัง
     >
       
       {/* แสดงปุ่มบันทึกแผนผังเฉพาะในโหมด Admin/Editor */}
       {!isReadOnly && (
-        <div className="absolute bottom-4 left-4 md:bottom-auto md:top-4 md:left-auto md:right-4 z-20 flex flex-wrap gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+        <div className="absolute top-4 left-4 z-20 flex flex-wrap gap-2 bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-slate-200">
           {/* Toggle ปิด/เปิด Magnet Grid */}
           <label className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-md border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors hidden md:flex">
             <input 
@@ -248,13 +256,13 @@ export default function ClassroomCanvas({
       {/* เส้นบอกกึ่งกลางห้อง (UI ตามรูป) */}
       <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-200 -translate-x-1/2 pointer-events-none hidden md:block" />
 
-      {/* ชุดปุ่ม Zoom สไตล์ Canva */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-white p-1 rounded-lg shadow-sm border border-slate-200 z-20">
-        <button onClick={() => setScale(s => Math.max(0.2, s / 1.2))} className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 rounded-md text-slate-700 font-bold text-lg transition-colors">-</button>
-        <button onClick={() => { setScale(1); setStagePos({ x: 0, y: 0 }); }} className="w-12 text-center text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
+      {/* ชุดปุ่ม Zoom */}
+      <div className="absolute bottom-6 right-4 flex items-center gap-1 bg-white/90 backdrop-blur p-1 rounded-lg shadow-sm border border-slate-200 z-20">
+        <button onClick={() => setScale(s => Math.max(0.2, s / 1.2))} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-md text-slate-700 font-bold text-lg transition-colors">-</button>
+        <button onClick={() => { setScale(1); setStagePos({ x: 0, y: 0 }); }} className="w-12 md:w-16 text-center text-xs md:text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors">
           {Math.round(scale * 100)}%
         </button>
-        <button onClick={() => setScale(s => Math.min(5, s * 1.2))} className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-100 rounded-md text-slate-700 font-bold text-lg transition-colors">+</button>
+        <button onClick={() => setScale(s => Math.min(5, s * 1.2))} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center bg-white hover:bg-slate-100 rounded-md text-slate-700 font-bold text-lg transition-colors">+</button>
       </div>
       
       <Stage 
@@ -265,6 +273,7 @@ export default function ClassroomCanvas({
         x={stagePos.x}
         y={stagePos.y}
         draggable={true} // อนุญาตให้ลากกระดานได้
+        onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}

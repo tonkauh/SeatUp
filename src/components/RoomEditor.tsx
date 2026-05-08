@@ -5,9 +5,10 @@ import dynamic from 'next/dynamic';
 
 const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { ssr: false });
 
-export default function RoomEditor({ room, onDataChange }: { room: any, onDataChange: () => Promise<void> }) {
+export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any, onDataChange: () => Promise<void>, onGoHome?: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('editor');
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   // แปลงเวลา ISO เป็น Format สำหรับ input time (HH:mm)
   const getLocalTime = (isoString?: string) => {
@@ -70,6 +71,22 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
     }
   };
 
+  // ฟังก์ชันยกเลิกเวลาเปิดจอง
+  const handleClearTime = async () => {
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .update({ start_time: null })
+        .eq('id', room.id);
+      if (error) throw error;
+      setStartTime('');
+      alert('ยกเลิกการตั้งเวลาเปิดจองเรียบร้อยแล้ว!');
+      await onDataChange();
+    } catch (error: any) {
+      alert('เกิดข้อผิดพลาด: ' + error.message);
+    }
+  };
+
   // 2. ฟังก์ชันยกเลิกการจองโดย Admin
   const handleDeleteBooking = async (bookingId: string) => {
     if (!confirm('ยืนยันที่จะยกเลิกการจองของโต๊ะนี้ใช่หรือไม่?')) return;
@@ -83,9 +100,16 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 flex flex-col md:space-y-6 h-full relative">
+      {/* โหมดมือถือ: ปุ่มลอยสำหรับเปิดเมนู Settings */}
+      <div className="md:hidden absolute top-4 right-4 z-50 flex gap-2">
+        <button onClick={() => setShowMobileMenu(true)} className="w-12 h-12 bg-white rounded-full shadow-lg border border-slate-200 flex items-center justify-center text-slate-900 focus:outline-none">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+      </div>
+
       {/* เมนูสลับหน้า Dashboard / Editor */}
-      <div className="flex p-1.5 bg-slate-200/60 backdrop-blur-md rounded-full w-fit mx-auto md:mx-0 border border-slate-200/50 shadow-inner">
+      <div className="hidden md:flex p-1.5 bg-slate-200/60 backdrop-blur-md rounded-full w-fit mx-auto md:mx-0 border border-slate-200/50 shadow-inner">
         <button 
           onClick={() => setActiveTab('dashboard')} 
           className={`px-6 md:px-8 py-2.5 rounded-full font-bold transition-all duration-300 text-sm md:text-base ${activeTab === 'dashboard' ? 'bg-white text-indigo-700 shadow-md shadow-slate-300/50 scale-100' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
@@ -106,8 +130,8 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
 
       {activeTab === 'editor' ? (
         /* ส่วนที่ 1: Editor จัดวางโต๊ะ */
-        <div className="bg-white md:p-8 rounded-none md:rounded-[2.5rem] shadow-none md:shadow-xl border-0 md:border border-indigo-100 animate-in fade-in duration-300 -mx-4 md:mx-0 flex flex-col h-[75vh] md:h-auto">
-          <div className="flex justify-between items-center mb-4 md:mb-6 px-4 md:px-0 pt-4 md:pt-0">
+        <div className="bg-slate-50 md:bg-white md:p-8 rounded-none md:rounded-[2.5rem] shadow-none md:shadow-xl border-0 md:border border-indigo-100 animate-in fade-in duration-300 flex flex-col flex-1 absolute inset-0 md:relative w-full h-full z-10">
+          <div className="hidden md:flex justify-between items-center mb-4 md:mb-6 px-4 md:px-0 pt-4 md:pt-0">
             <h3 className="text-lg font-bold text-slate-800 uppercase tracking-widest">
               โหมดจัดวางโต๊ะเรียน
             </h3>
@@ -117,7 +141,7 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
           </div>
   
           {/* กล่องตั้งเวลาเปิดจอง */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 mb-6 flex flex-col md:flex-row items-center gap-4 justify-between">
+          <div className="hidden md:flex bg-slate-50 p-5 rounded-2xl border border-slate-200 mb-6 flex-col md:flex-row items-center gap-4 justify-between shadow-sm">
             <div className="flex-1 text-center md:text-left">
             <h4 className="font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2 justify-center md:justify-start">
               <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> ตั้งเวลาเปิดจอง
@@ -129,9 +153,12 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="flex-1 p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-red-600 bg-white font-medium"
+                className="flex-1 p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white font-bold text-slate-700"
               />
-              <button onClick={handleSaveTime} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide">Save</button>
+              <button onClick={handleSaveTime} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide shadow-sm">Save</button>
+              {startTime && (
+                <button onClick={handleClearTime} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide border border-red-100">Clear</button>
+              )}
             </div>
           </div>
 
@@ -142,14 +169,14 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
             isReadOnly={false}  
           />
           
-          <div className="mt-2 md:mt-6 text-center text-slate-400 text-xs md:text-sm pb-4 md:pb-0">
+          <div className="hidden md:block mt-2 md:mt-6 text-center text-slate-400 text-xs md:text-sm pb-4 md:pb-0">
             * ระบบจะบันทึกแผนผังอัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง *
           </div>
         </div>
       ) : (
         /* ส่วนที่ 2: Dashboard แสดงรายชื่อผู้จอง */
-        <div className="space-y-4 md:space-y-6">
-          <div className="bg-white md:p-6 rounded-none md:rounded-2xl border-0 md:border border-slate-200 animate-in fade-in duration-300 -mx-4 md:mx-0 h-[50vh] md:h-auto flex flex-col">
+        <div className="space-y-4 md:space-y-6 bg-slate-50 md:bg-transparent absolute inset-0 md:relative z-10 p-4 md:p-0 overflow-y-auto">
+          <div className="bg-white md:p-6 rounded-2xl border border-slate-200 animate-in fade-in duration-300 flex flex-col shrink-0 overflow-hidden">
             <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide mb-4 px-4 md:px-0 pt-4 md:pt-0">ภาพรวมแผนผัง</h3>
             <ClassroomCanvas 
               initialLayout={room.layout_config} 
@@ -158,7 +185,7 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
               isReadOnly={true}  
             />
           </div>
-          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 animate-in fade-in duration-300">
+          <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 animate-in fade-in duration-300 mb-20 md:mb-0">
             <div className="flex justify-between items-center mb-4 md:mb-6">
               <div>
                 <h3 className="text-lg font-black text-slate-900 uppercase tracking-wide mb-1">รายชื่อผู้จอง</h3>
@@ -203,6 +230,75 @@ export default function RoomEditor({ room, onDataChange }: { room: any, onDataCh
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Menu Popup (แสดงเฉพาะมือถือเมื่อกดปุ่มเมนู) */}
+      {showMobileMenu && (
+        <div className="md:hidden fixed inset-0 z-[100] flex items-end bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300">
+          <div className="bg-white w-full rounded-t-3xl p-6 pb-10 animate-in slide-in-from-bottom-full duration-300 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] relative">
+            {/* Handle Bar */}
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
+            
+            <button onClick={() => setShowMobileMenu(false)} className="absolute top-5 right-5 p-2 bg-slate-100 rounded-full text-slate-500">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            <div className="mb-6">
+              <h2 className="text-xl font-bold uppercase mb-1">{room.name}</h2>
+              <p className="text-sm text-slate-500 font-mono tracking-widest">Join Code: {room.join_code}</p>
+            </div>
+
+            {/* สลับหน้าโหมด */}
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+              <button 
+                onClick={() => { setActiveTab('dashboard'); setShowMobileMenu(false); }} 
+                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'dashboard' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+              >
+                รายชื่อผู้จอง
+              </button>
+              <button 
+                onClick={() => { setActiveTab('editor'); setShowMobileMenu(false); }} 
+                className={`flex-1 py-3 rounded-lg font-bold text-sm transition-all ${activeTab === 'editor' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+              >
+                จัดแผนผัง
+              </button>
+            </div>
+
+            {/* ตั้งเวลาเปิดจอง (โชว์เฉพาะถ้าอยู่หน้า Editor) */}
+            {activeTab === 'editor' && (
+              <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                <label className="flex items-center gap-2 text-sm font-bold text-slate-900 mb-3">
+                  <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  ตั้งเวลาเปิดจอง
+                </label>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="flex-1 p-3 rounded-lg border border-slate-300 text-base outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
+                  />
+                  <button onClick={() => { handleSaveTime(); setShowMobileMenu(false); }} className="bg-slate-900 text-white px-5 rounded-lg font-bold uppercase shadow-md">Save</button>
+                </div>
+                {startTime && (
+                  <button onClick={() => { handleClearTime(); setShowMobileMenu(false); }} className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg uppercase tracking-wider text-sm border border-red-100 transition-colors">
+                    ยกเลิกการตั้งเวลา
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ปุ่มกลับหน้าโฮม */}
+            {onGoHome && (
+              <button 
+                onClick={() => { setShowMobileMenu(false); onGoHome(); }}
+                className="w-full flex items-center justify-center gap-2 py-4 text-red-600 font-bold bg-red-50 rounded-xl uppercase tracking-wider"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg> ออกจากระบบ
+              </button>
             )}
           </div>
         </div>

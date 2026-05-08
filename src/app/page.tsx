@@ -75,9 +75,9 @@ function PageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-10">
-      <div className="max-w-5xl mx-auto">
-        <button onClick={() => { setView('landing'); setEditingRoom(null); }} className="mb-6 text-slate-400 hover:text-slate-600 transition-colors font-medium flex items-center gap-2">
+    <div className={`min-h-[100dvh] bg-slate-50 ${view === 'editor' ? 'p-0 md:p-6 flex flex-col' : 'p-4 md:p-10'}`}>
+      <div className={`${view === 'editor' ? 'max-w-[1600px] w-full flex-1 flex flex-col relative' : 'max-w-5xl mx-auto'}`}>
+        <button onClick={() => { setView('landing'); setEditingRoom(null); }} className={`${view === 'editor' ? 'hidden md:flex' : 'flex'} mb-6 text-slate-400 hover:text-slate-600 transition-colors font-medium items-center gap-2`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
           กลับหน้าหลัก
         </button>
@@ -134,14 +134,15 @@ function PageContent() {
         )}
 
         {view === 'editor' && editingRoom && (
-          <div className="animate-in fade-in duration-500">
-            <div className="bg-slate-900 text-white p-4 md:p-8 rounded-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold uppercase">{editingRoom.name}</h2>
+          <div className="animate-in fade-in duration-500 flex-1 flex flex-col relative">
+            {/* หัวข้อจะถูกซ่อนบนมือถือเพื่อประหยัดพื้นที่ และไปแสดงใน Popup แทน */}
+            <div className="hidden md:flex bg-slate-900 text-white p-4 md:p-8 rounded-2xl mb-8 flex-col md:flex-row justify-between items-center gap-4">
+              <div className="w-full">
+                <h2 className="text-2xl font-bold uppercase">{editingRoom.name}</h2>
                 <p className="text-slate-400 text-sm mt-1 tracking-widest">รหัสเข้าร่วม (Join Code): <span className="font-mono font-bold text-white text-lg ml-1">{editingRoom.join_code}</span></p>
               </div>
             </div>
-            <RoomEditor room={editingRoom} onDataChange={refetchEditingRoom} />
+            <RoomEditor room={editingRoom} onDataChange={refetchEditingRoom} onGoHome={() => { setView('landing'); setEditingRoom(null); }} />
           </div>
         )}
 
