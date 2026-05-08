@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Rect, Text, Group } from 'react-konva';
+import { useDialog } from '@/components/DialogContext';
+import { Stage, Layer, Rect, Text, Group, Path } from 'react-konva';
 
 interface ClassroomCanvasProps {
   initialLayout: any[];
@@ -24,6 +25,15 @@ export default function ClassroomCanvas({
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const lastDist = useRef<number>(0);
   const [editingDesk, setEditingDesk] = useState<any>(null); // State สำหรับโต๊ะที่ถูกคลิกตั้งค่า
+  const { showAlert, showConfirm } = useDialog();
+  
+  const [useMagnetGrid, setUseMagnetGrid] = useState(true); // สำหรับเปิด-ปิด Snap to Grid เวลาลาก
+  const [showAutoLayoutModal, setShowAutoLayoutModal] = useState(false);
+  const [autoLayoutConfig, setAutoLayoutConfig] = useState({
+    totalDesks: 30,
+    desksPerColumn: 5, // เปลี่ยนจากจำนวนคอลัมน์ เป็น จำนวนโต๊ะต่อคอลัมน์ (แนวตั้ง)
+    deskType: 'single' as 'single' | 'double'
+  });
 
   useEffect(() => {
     setDesks(initialLayout || []);
@@ -46,26 +56,6 @@ export default function ClassroomCanvas({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, [initialLayout]);
-
-  // ใช้ Scroll เมาส์เพื่อ Zoom
-  const handleWheel = (e: any) => {
-    e.evt.preventDefault();
-    const scaleBy = 1.1;
-    const stage = e.target.getStage();
-    const oldScale = stage.scaleX();
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
-
-    const mousePointTo = { x: (pointer.x - stage.x()) / oldScale, y: (pointer.y - stage.y()) / oldScale };
-    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-    const boundedScale = Math.max(0.2, Math.min(newScale, 5)); // ล็อกการซูมไว้ที่ 20% - 500%
-
-    setScale(boundedScale);
-    setStagePos({
-      x: pointer.x - mousePointTo.x * boundedScale,
-      y: pointer.y - mousePointTo.y * boundedScale,
-    });
-  };
 
   // ระบบ Pinch-to-Zoom สำหรับหน้าจอมือถือ (ใช้ 2 นิ้วซูม)
   const getDistance = (p1: any, p2: any) => {
@@ -116,17 +106,18 @@ export default function ClassroomCanvas({
 
   // ขนาดโต๊ะมาตรฐาน
   const deskWidth = 80;
-  const deskHeight = 55;
+  const deskHeight = 60; // ปรับจาก 55 เป็น 60 เพื่อให้หาร 20 ลงตัว (พอดี 3 ช่อง Grid)
 
   // อัปเดตตำแหน่งเมื่อลากโต๊ะเสร็จ
   const handleDragEnd = (id: string, e: any) => {
     if (isReadOnly) return;
-    // ป้องกันไม่ให้อัปเดตโต๊ะ ถ้าผู้ใช้กำลังลากพื้นกระดาน (Stage)
-    if (e.target === e.target.getStage()) return;
+    if (e.target === e.target.getStage()) return; // ป้องกันไม่ให้อัปเดตโต๊ะ ถ้าผู้ใช้กำลังลากพื้นกระดาน (Stage)
 
     const newDesks = desks.map((d: any) => {
       if (d.id === id) {
-        return { ...d, x: Math.round(e.target.x() / 10) * 10, y: Math.round(e.target.y() / 10) * 10 }; // snap ลง grid ทีละ 10px
+        const newX = useMagnetGrid ? Math.round(e.target.x() / 20) * 20 : e.target.x();
+        const newY = useMagnetGrid ? Math.round(e.target.y() / 20) * 20 : e.target.y();
+        return { ...d, x: newX, y: newY };
       }
       return d;
     });
@@ -137,11 +128,81 @@ export default function ClassroomCanvas({
   const handleAddDesk = () => {
     const newDesk = {
       id: `T${Date.now()}`,
-      x: 50,
-      y: 50,
+      x: 60, // เริ่มต้นให้ลงล็อก Grid 20px
+      y: 60,
       label: `T${desks.length + 1}` // รันเลขโต๊ะอัตโนมัติตามจำนวนที่มี
     };
     setDesks([...desks, newDesk]);
+  };
+
+  // ฟังก์ชันจัดโต๊ะอัตโนมัติ (Auto-Layout)
+  const handleAutoLayout = async () => {
+    const { totalDesks, desksPerColumn, deskType } = autoLayoutConfig;
+    const newDesks = [];
+    const spacingX = 40; // เพิ่มระยะห่างเป็น 40px (2 ช่อง Grid) ให้เท่ากันชัดเจน
+    const spacingY = 40;
+    const safeDesksPerCol = Math.max(1, desksPerColumn); // ป้องกันหาร 0
+
+    let startX = 60;
+    const startY = 60; // เปลี่ยนจาก 50 เป็น 60 ให้ลงล็อก Grid
+
+    // คำนวณความกว้างรวมเพื่อหาจุดเริ่มต้นกึ่งกลาง
+    let totalWidth = 0;
+    if (deskType === 'single') {
+      const cols = Math.ceil(totalDesks / safeDesksPerCol);
+      totalWidth = cols * deskWidth + (cols - 1) * spacingX;
+    } else {
+      const totalPairs = Math.ceil(totalDesks / 2);
+      const cols = Math.ceil(totalPairs / safeDesksPerCol);
+      totalWidth = cols * (2 * deskWidth) + (cols - 1) * spacingX;
+    }
+    startX = Math.max(60, (dimensions.width - totalWidth) / 2);
+    startX = Math.round(startX / 20) * 20; // บังคับให้จุดเริ่มแกน X ลงล็อก Magnet Grid 100%
+
+    for (let i = 0; i < totalDesks; i++) {
+      let row, col, x = 0, y = 0;
+
+      if (deskType === 'single') {
+        col = Math.floor(i / safeDesksPerCol); // จัดเรียงลงมาในแนวตั้งทีละคอลัมน์
+        row = i % safeDesksPerCol;
+        
+        x = startX + col * (deskWidth + spacingX);
+        y = startY + row * (deskHeight + spacingY);
+
+      } else if (deskType === 'double') {
+        const pairIndex = Math.floor(i / 2);
+        const isSecondInPair = i % 2 !== 0;
+        
+        col = Math.floor(pairIndex / safeDesksPerCol);
+        row = pairIndex % safeDesksPerCol;
+
+        x = startX + col * (2 * deskWidth + spacingX);
+        if (isSecondInPair) x += deskWidth; // โต๊ะคู่ตัวที่สองติดกับตัวแรก
+
+        y = startY + row * (deskHeight + spacingY);
+      }
+
+      // Snap ลง Grid อัตโนมัติเวลาสร้าง
+      if (useMagnetGrid) {
+        x = Math.round(x / 20) * 20;
+        y = Math.round(y / 20) * 20;
+      }
+
+      newDesks.push({
+        id: `T${Date.now()}_${i}`,
+        x, y,
+        label: `T${i + 1}`,
+        isLocked: false,
+        isObject: false
+      });
+    }
+
+    const isConfirmed = await showConfirm('การจัดโต๊ะอัตโนมัติจะล้างแผนผังเดิมทั้งหมด คุณแน่ใจหรือไม่?');
+    if (isConfirmed) {
+      setDesks(newDesks);
+      setShowAutoLayoutModal(false);
+      onSave(newDesks); // บันทึกลงฐานข้อมูลอัตโนมัติ
+    }
   };
 
   return (
@@ -153,18 +214,33 @@ export default function ClassroomCanvas({
       
       {/* แสดงปุ่มบันทึกแผนผังเฉพาะในโหมด Admin/Editor */}
       {!isReadOnly && (
-        <div className="absolute bottom-4 left-4 md:bottom-auto md:top-4 md:left-auto md:right-4 z-20 flex gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+        <div className="absolute bottom-4 left-4 md:bottom-auto md:top-4 md:left-auto md:right-4 z-20 flex flex-wrap gap-2 bg-white p-2 rounded-lg shadow-sm border border-slate-200">
+          {/* Toggle ปิด/เปิด Magnet Grid */}
+          <label className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-md border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors hidden md:flex">
+            <input 
+              type="checkbox" 
+              checked={useMagnetGrid} 
+              onChange={(e) => setUseMagnetGrid(e.target.checked)}
+              className="w-4 h-4 text-slate-900 rounded focus:ring-slate-900 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Magnet Grid</span>
+          </label>
+          
+          <button
+            onClick={() => setShowAutoLayoutModal(true)}
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md font-bold transition-colors text-sm flex items-center uppercase"
+          >
+            <span className="flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> Auto Layout
+            </span>
+          </button>
           <button
             onClick={handleAddDesk}
             className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-md font-bold transition-colors text-sm flex items-center uppercase"
           >
-            + เพิ่มโต๊ะ
-          </button>
-          <button
-            onClick={() => onSave(desks)}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-bold transition-colors text-sm flex items-center uppercase"
-          >
-            💾 บันทึกแผนผัง
+            <span className="flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg> Add Desk
+            </span>
           </button>
         </div>
       )}
@@ -189,7 +265,6 @@ export default function ClassroomCanvas({
         x={stagePos.x}
         y={stagePos.y}
         draggable={true} // อนุญาตให้ลากกระดานได้
-        onWheel={handleWheel}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
@@ -220,14 +295,27 @@ export default function ClassroomCanvas({
                 x={desk.x}
                 y={desk.y}
                 draggable={!isReadOnly && !desk.isLocked} // ลากไม่ได้ถ้าถูกล็อก หรือเป็นโหมด ReadOnly
+                dragBoundFunc={(pos) => {
+                  // บังคับลงล็อก Grid แบบ Real-time ขณะกำลังลาก
+                  if (!useMagnetGrid) return pos;
+                  const logicalX = (pos.x - stagePos.x) / scale;
+                  const logicalY = (pos.y - stagePos.y) / scale;
+                  
+                  const snappedX = Math.round(logicalX / 20) * 20;
+                  const snappedY = Math.round(logicalY / 20) * 20;
+                  return {
+                    x: snappedX * scale + stagePos.x,
+                    y: snappedY * scale + stagePos.y,
+                  };
+                }}
                 onDragEnd={(e) => handleDragEnd(desk.id, e)}
                 onClick={() => {
                   if (isReadOnly) {
-                    if (desk.isObject) return alert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
+                    if (desk.isObject) return showAlert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
                     if (!isBooked) {
                       onSave(desk.label); // ถ้าว่างถึงจะกดจองได้
                     } else {
-                      alert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
+                      showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }
                   } else {
                     setEditingDesk({ ...desk }); // เปิด Modal ตั้งค่าโต๊ะ
@@ -235,11 +323,11 @@ export default function ClassroomCanvas({
                 }}
                 onTap={() => { // เพิ่ม onTap สำหรับรองรับบนมือถือ
                   if (isReadOnly) {
-                    if (desk.isObject) return alert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
+                    if (desk.isObject) return showAlert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
                     if (!isBooked) {
                       onSave(desk.label);
                     } else {
-                      alert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
+                      showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }
                   } else {
                     setEditingDesk({ ...desk });
@@ -267,16 +355,23 @@ export default function ClassroomCanvas({
                   stroke={strokeColor}
                   strokeWidth={2}
                   cornerRadius={10}
-                  // เอฟเฟกต์เงา
-                  shadowColor="rgba(0,0,0,0.1)"
-                  shadowBlur={isBooked ? 0 : 5}
-                  shadowOffset={{ x: 0, y: isBooked ? 0 : 3 }}
-                  shadowOpacity={0.5}
+                  // ปิด Perfect Draw ช่วยลดอาการกระตุกตอนซูม/แพนมหาศาล
+                  perfectDrawEnabled={false} 
                 />
                 
                 {/* แสดงไอคอนล็อกเฉพาะโหมด Editor */}
                 {!isReadOnly && desk.isLocked && (
-                  <Text text="🔒" x={5} y={5} fontSize={10} />
+                  <Path 
+                    data="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" 
+                    stroke="#64748B" 
+                    strokeWidth={2} 
+                    fill="none"
+                    scale={{x: 0.5, y: 0.5}} 
+                    x={5} 
+                    y={5} 
+                    listening={false} // ปิดการรับ Event คลิก
+                    perfectDrawEnabled={false}
+                  />
                 )}
 
                 {/* หมายเลขโต๊ะ (ซ่อนมุมบนขวาถ้าเป็นสิ่งของ) */}
@@ -288,6 +383,8 @@ export default function ClassroomCanvas({
                     fontSize={10}
                     fontStyle="bold"
                     fill={isBooked ? "#94A3B8" : "#166534"}
+                    listening={false} // ปิด Event ทำให้เมาส์ไม่หน่วง
+                    perfectDrawEnabled={false}
                   />
                 )}
 
@@ -306,6 +403,8 @@ export default function ClassroomCanvas({
                   // ตัดคำถ้าชื่อยาวเกิน
                   ellipsis={true}
                   wrap="none"
+                  listening={false}
+                  perfectDrawEnabled={false}
                 />
               </Group>
             );
@@ -317,11 +416,13 @@ export default function ClassroomCanvas({
       {!isReadOnly && editingDesk && (
         <div 
           className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-          onPointerDown={(e) => e.stopPropagation()} // ป้องกันการลากแผนผังทะลุ
+          onPointerDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
         >
           <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm border border-slate-200">
-            <h3 className="text-lg font-bold mb-4 text-slate-900 uppercase border-b border-slate-100 pb-2">⚙️ ตั้งค่าวัตถุ</h3>
+            <h3 className="text-lg font-bold mb-4 text-slate-900 uppercase border-b border-slate-100 pb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> ตั้งค่าวัตถุ
+            </h3>
             
             <div className="space-y-4">
               <div>
@@ -342,7 +443,9 @@ export default function ClassroomCanvas({
                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-bold text-slate-800">🔒 ล็อกตำแหน่ง</div>
+                  <div className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> ล็อกตำแหน่ง
+                  </div>
                   <div className="text-xs text-slate-400">ป้องกันการเผลอลากขยับ</div>
                 </div>
               </label>
@@ -355,7 +458,9 @@ export default function ClassroomCanvas({
                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
                 />
                 <div className="flex-1">
-                  <div className="text-sm font-bold text-slate-800">📦 เป็นสิ่งของตกแต่ง</div>
+                  <div className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> เป็นสิ่งของตกแต่ง
+                  </div>
                   <div className="text-xs text-slate-400">ผู้ใช้จะไม่สามารถจองได้</div>
                 </div>
               </label>
@@ -389,6 +494,61 @@ export default function ClassroomCanvas({
                 className="px-5 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors text-sm uppercase"
               >
                 Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal สำหรับจัดโต๊ะอัตโนมัติ */}
+      {!isReadOnly && showAutoLayoutModal && (
+        <div 
+          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onPointerDown={(e) => e.stopPropagation()}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4 text-slate-900 uppercase border-b border-slate-100 pb-2 flex items-center gap-2">
+              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> Auto Layout
+            </h3>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะทั้งหมด</label>
+                  <input type="number" value={autoLayoutConfig.totalDesks} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, totalDesks: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">จำนวนโต๊ะต่อคอลัมน์ (แนวตั้ง)</label>
+                  <input type="number" value={autoLayoutConfig.desksPerColumn} onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, desksPerColumn: parseInt(e.target.value) || 0})} className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ประเภทโต๊ะ</label>
+                <select
+                  value={autoLayoutConfig.deskType}
+                  onChange={(e) => setAutoLayoutConfig({...autoLayoutConfig, deskType: e.target.value as 'single' | 'double'})}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors bg-white"
+                >
+                  <option value="single">โต๊ะเดี่ยว (Single)</option>
+                  <option value="double">โต๊ะคู่ (Double)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setShowAutoLayoutModal(false)}
+                className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors text-sm uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAutoLayout}
+                className="px-5 py-2 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 transition-colors text-sm uppercase"
+              >
+                Generate Layout
               </button>
             </div>
           </div>

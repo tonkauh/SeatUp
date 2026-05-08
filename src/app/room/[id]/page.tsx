@@ -81,8 +81,14 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
   };
 
   const confirmBooking = async () => {
-    if (!studentName.trim()) return alert('⚠️ กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน');
-    if (!selectedSeat) return alert('⚠️ กรุณาเลือกที่นั่งบนแผนผัง');
+    if (!studentName.trim()) return alert('กรุณากรอกชื่อ-นามสกุลก่อนยืนยัน');
+    if (!selectedSeat) return alert('กรุณาเลือกที่นั่งบนแผนผัง');
+
+    // เช็คว่าชื่อนี้เคยจองไปแล้วหรือยัง (จำกัดสิทธิ์ 1 คน 1 โต๊ะ)
+    const hasBooked = bookings.some(b => b.user_name.trim().toLowerCase() === studentName.trim().toLowerCase());
+    if (hasBooked) {
+      return alert('ขออภัยครับ 1 ท่านสามารถจองได้เพียง 1 ที่นั่งเท่านั้น');
+    }
 
     const { error } = await supabase.from('bookings').insert([{
       room_id: room.id,
@@ -92,7 +98,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
     if (error) alert('Error: ' + error.message);
     else {
-      alert('✅ จองที่นั่งสำเร็จ!');
+      alert('จองที่นั่งสำเร็จ!');
       window.location.reload();
     }
   };
@@ -127,8 +133,10 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
       {/* 2. เมนูรายละเอียดการจอง (ขวา) */}
       <div className="w-full md:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-20 border-t md:border-t-0 md:border-l border-slate-200">
-        <div className="bg-slate-900 text-white p-5 md:p-6 text-lg font-bold tracking-widest uppercase">
-           BOOKING SUMMARY
+        <div className="bg-slate-900 text-white p-5 md:p-6 text-lg font-black tracking-widest uppercase flex items-center gap-3 relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+           <svg className="w-6 h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+           <span className="relative z-10">BOOKING SUMMARY</span>
         </div>
 
         <div className="p-5 md:p-6 flex-grow flex flex-col">
@@ -150,13 +158,14 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
            <button 
              onClick={confirmBooking}
              disabled={showOverlay}
-             className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-4 rounded-lg font-bold text-lg uppercase tracking-wide transition-colors"
+             className="w-full bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-4 rounded-lg font-bold text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0"
            >
              {showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
            </button>
            
-           <button onClick={() => window.location.href = '/'} className="mt-4 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors">
-              ← กลับหน้าหลัก
+           <button onClick={() => window.location.href = '/'} className="mt-4 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors flex items-center justify-center gap-2 w-full">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              กลับหน้าหลัก
            </button>
         </div>
       </div>
@@ -164,37 +173,21 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
       {/* Overlay นับถอยหลังรอจอง */}
       {showOverlay && (
         <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md transition-opacity duration-500 ${isFadingOut ? 'opacity-0' : 'animate-in fade-in'}`}>
-          <div className="bg-slate-900 border border-slate-800 p-8 md:p-12 rounded-[2.5rem] shadow-2xl text-center flex flex-col items-center max-w-lg w-11/12 relative overflow-hidden">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1.5 bg-red-600" />
-            <div className="text-4xl md:text-5xl mb-4">⏳</div>
-            <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest mb-2">ยังไม่ถึงเวลาเปิดจอง</h2>
-            <p className="text-slate-400 mb-8 text-sm">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
+          <div className="text-center flex flex-col items-center z-10 px-4">
+            <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-widest mb-2 md:mb-4 drop-shadow-lg">ยังไม่ถึงเวลาเปิดจอง</h2>
+            <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
 
             {timeLeft && (
-              <div className="flex gap-3 md:gap-4 text-white">
-                {timeLeft.d > 0 && (
+              <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                {timeLeft.h > 0 && (
                   <>
-                    <div className="flex flex-col items-center">
-                      <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 rounded-xl flex items-center justify-center text-2xl md:text-3xl font-mono font-bold border border-slate-700">{timeLeft.d}</div>
-                      <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">Days</span>
-                    </div>
-                    <div className="text-2xl font-bold mt-3 text-slate-600">:</div>
+                    <span>{timeLeft.h.toString().padStart(2, '0')}</span>
+                    <span className="text-slate-500/80 -mt-1">:</span>
                   </>
                 )}
-                <div className="flex flex-col items-center">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 rounded-xl flex items-center justify-center text-2xl md:text-3xl font-mono font-bold border border-slate-700">{timeLeft.h.toString().padStart(2, '0')}</div>
-                  <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">Hours</span>
-                </div>
-                <div className="text-2xl font-bold mt-3 text-slate-600">:</div>
-                <div className="flex flex-col items-center">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 rounded-xl flex items-center justify-center text-2xl md:text-3xl font-mono font-bold border border-slate-700">{timeLeft.m.toString().padStart(2, '0')}</div>
-                  <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">Mins</span>
-                </div>
-                <div className="text-2xl font-bold mt-3 text-slate-600">:</div>
-                <div className="flex flex-col items-center">
-                  <div className="w-14 h-14 md:w-16 md:h-16 bg-slate-800 rounded-xl flex items-center justify-center text-2xl md:text-3xl font-mono font-bold text-red-500 border border-slate-700 shadow-[0_0_15px_rgba(220,38,38,0.2)]">{timeLeft.s.toString().padStart(2, '0')}</div>
-                  <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-widest">Secs</span>
-                </div>
+                <span>{timeLeft.m.toString().padStart(2, '0')}</span>
+                <span className="text-slate-500/80 -mt-1">:</span>
+                <span className="text-red-500 drop-shadow-[0_0_20px_rgba(220,38,38,0.5)]">{timeLeft.s.toString().padStart(2, '0')}</span>
               </div>
             )}
           </div>
