@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# สภาพแวดล้อมและตัวแปรความลับ
+.env
+.env.local
+
+# โฟลเดอร์ที่เก็บ Library (ห้าม Push เพราะมันหนักและโหลดใหม่ได้)
+node_modules/
+__pycache__/
+venv/
+
+# ไฟล์ระบบของ OS
+.DS_Store
+Thumbs.db
