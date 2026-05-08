@@ -26,6 +26,7 @@ export default function ClassroomCanvas({
   const lastDist = useRef<number>(0);
   const [editingDesk, setEditingDesk] = useState<any>(null); // State สำหรับโต๊ะที่ถูกคลิกตั้งค่า
   const { showAlert, showConfirm } = useDialog();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   
   const [useMagnetGrid, setUseMagnetGrid] = useState(true); // สำหรับเปิด-ปิด Snap to Grid เวลาลาก
   const [showAutoLayoutModal, setShowAutoLayoutModal] = useState(false);
@@ -121,26 +122,72 @@ export default function ClassroomCanvas({
     if (isReadOnly) return;
     if (e.target === e.target.getStage()) return; // ป้องกันไม่ให้อัปเดตโต๊ะ ถ้าผู้ใช้กำลังลากพื้นกระดาน (Stage)
 
-    const newDesks = desks.map((d: any) => {
-      if (d.id === id) {
         const newX = useMagnetGrid ? Math.round(e.target.x() / 20) * 20 : e.target.x();
         const newY = useMagnetGrid ? Math.round(e.target.y() / 20) * 20 : e.target.y();
+
+        // เช็กการซ้อนทับ (Collision Detection)
+        const margin = 10; // ระยะยืดหยุ่นยอมให้ขอบซ้อนทับกันได้ 10px
+        const isColliding = desks.some((d: any) => {
+          if (d.id === id) return false; // ไม่เช็กตัวเอง
+          // ค้นหาว่าขอบของโต๊ะทับกันหรือไม่ (หักลบ margin ออก)
+          return (
+            newX + margin < d.x + deskWidth - margin &&
+            newX + deskWidth - margin > d.x + margin &&
+            newY + margin < d.y + deskHeight - margin &&
+            newY + deskHeight - margin > d.y + margin
+          );
+        });
+
+        if (isColliding) {
+          // ถ้าซ้อนทับ ให้เด้งกลับไปจุดเดิม
+          const originalDesk = desks.find((d: any) => d.id === id);
+          if (originalDesk) {
+            e.target.position({ x: originalDesk.x, y: originalDesk.y });
+            e.target.getLayer()?.batchDraw(); // สั่งให้วาดเฟรมใหม่เพื่อรีเฟรช UI ทันที
+          }
+          setToastMessage('ไม่สามารถวางโต๊ะซ้อนทับกันได้ครับ');
+          setTimeout(() => setToastMessage(null), 3000); // แจ้งเตือน 3 วินาทีแล้วซ่อนเอง
+          return;
+        }
+
+    const newDesks = desks.map((d: any) => {
+      if (d.id === id) {
         return { ...d, x: newX, y: newY };
       }
       return d;
     });
     setDesks(newDesks);
+    onSave(newDesks); // บันทึกลงฐานข้อมูลอัตโนมัติเมื่อลากเสร็จ
   };
 
   // ฟังก์ชันเพิ่มโต๊ะใหม่ลงใน Canvas
   const handleAddDesk = () => {
+        let newX = 60;
+        let newY = 60;
+        let isOccupied = true;
+        const margin = 10;
+        
+        // หาตำแหน่งที่ว่างเพื่อไม่ให้โต๊ะเกิดมาทับกัน
+        while (isOccupied) {
+          isOccupied = desks.some((d: any) => (
+            newX + margin < d.x + deskWidth - margin && newX + deskWidth - margin > d.x + margin &&
+            newY + margin < d.y + deskHeight - margin && newY + deskHeight - margin > d.y + margin
+          ));
+          if (isOccupied) {
+            newX += 20;
+            newY += 20;
+          }
+        }
+
     const newDesk = {
       id: `T${Date.now()}`,
-      x: 60, // เริ่มต้นให้ลงล็อก Grid 20px
-      y: 60,
+          x: newX, 
+          y: newY,
       label: `T${desks.length + 1}` // รันเลขโต๊ะอัตโนมัติตามจำนวนที่มี
     };
-    setDesks([...desks, newDesk]);
+    const updatedDesks = [...desks, newDesk];
+    setDesks(updatedDesks);
+    onSave(updatedDesks); // บันทึกลงฐานข้อมูลอัตโนมัติเมื่อเพิ่มโต๊ะใหม่
   };
 
   // ฟังก์ชันจัดโต๊ะอัตโนมัติ (Auto-Layout)
@@ -219,6 +266,12 @@ export default function ClassroomCanvas({
       className="w-full h-full min-h-[50vh] md:min-h-[600px] flex-1 bg-slate-50 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] rounded-none md:rounded-xl border-y md:border border-slate-200 overflow-hidden relative group"
       style={{ touchAction: 'none' }} // ป้องกันจอไหลตอนใช้นิ้วลากแผนผัง
     >
+      {/* Toast แจ้งเตือนขนาดเล็ก */}
+      {toastMessage && (
+        <div className="absolute top-20 md:top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm animate-in fade-in slide-in-from-top-4 pointer-events-none">
+          {toastMessage}
+        </div>
+      )}
       
       {/* แสดงปุ่มบันทึกแผนผังเฉพาะในโหมด Admin/Editor */}
       {!isReadOnly && (
@@ -304,17 +357,18 @@ export default function ClassroomCanvas({
                 x={desk.x}
                 y={desk.y}
                 draggable={!isReadOnly && !desk.isLocked} // ลากไม่ได้ถ้าถูกล็อก หรือเป็นโหมด ReadOnly
-                dragBoundFunc={(pos) => {
-                  // บังคับลงล็อก Grid แบบ Real-time ขณะกำลังลาก
-                  if (!useMagnetGrid) return pos;
-                  const logicalX = (pos.x - stagePos.x) / scale;
-                  const logicalY = (pos.y - stagePos.y) / scale;
+                dragBoundFunc={function(this: any, pos) {
+                  let logicalX = (pos.x - stagePos.x) / scale;
+                  let logicalY = (pos.y - stagePos.y) / scale;
                   
-                  const snappedX = Math.round(logicalX / 20) * 20;
-                  const snappedY = Math.round(logicalY / 20) * 20;
+                  if (useMagnetGrid) {
+                    logicalX = Math.round(logicalX / 20) * 20;
+                    logicalY = Math.round(logicalY / 20) * 20;
+                  }
+
                   return {
-                    x: snappedX * scale + stagePos.x,
-                    y: snappedY * scale + stagePos.y,
+                    x: logicalX * scale + stagePos.x,
+                    y: logicalY * scale + stagePos.y,
                   };
                 }}
                 onDragEnd={(e) => handleDragEnd(desk.id, e)}
