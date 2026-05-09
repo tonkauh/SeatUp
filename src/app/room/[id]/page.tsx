@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
@@ -11,9 +11,11 @@ const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), {
 });
 
 // แยกเนื้อหาออกมาเพื่อสามารถเรียกใช้ useDialog ได้
-function BookingContent({ roomId, nameFromQuery }: { roomId: string, nameFromQuery: string | null }) {
+function BookingContent({ roomId }: { roomId: string }) {
   const router = useRouter();
   const { showAlert } = useDialog();
+  const searchParams = useSearchParams();
+  const nameFromQuery = searchParams.get('name');
 
   const [room, setRoom] = useState<any>(null);
   const [bookings, setBookings] = useState<any[]>([]);
@@ -242,10 +244,11 @@ function BookingContent({ roomId, nameFromQuery }: { roomId: string, nameFromQue
 
 export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const searchParams = useSearchParams();
   return (
     <DialogProvider>
-      <BookingContent roomId={resolvedParams.id} nameFromQuery={searchParams.get('name')} />
+      <Suspense fallback={<div className="min-h-screen bg-black text-white flex items-center justify-center">LOADING...</div>}>
+        <BookingContent roomId={resolvedParams.id} />
+      </Suspense>
     </DialogProvider>
   )
 }
