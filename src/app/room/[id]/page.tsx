@@ -60,6 +60,15 @@ function BookingContent({ roomId, nameFromQuery }: { roomId: string, nameFromQue
     };
   }, [roomId]);
 
+  // เปลี่ยนชื่อแท็บเบราว์เซอร์ให้เป็นชื่อห้องอัตโนมัติ
+  useEffect(() => {
+    if (room?.name) {
+      document.title = `${room.name} | SeatUp`;
+    } else {
+      document.title = "SeatUp";
+    }
+  }, [room]);
+
   // ระบบนับถอยหลัง
   useEffect(() => {
     if (!room?.start_time) return;

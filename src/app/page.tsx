@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DialogProvider, useDialog } from '@/components/DialogContext';
 import AdminPanel from '@/components/AdminPanel';
@@ -25,6 +25,10 @@ function PageContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  useEffect(() => {
+    document.title = "SeatUp";
+  }, []);
 
   const refetchEditingRoom = async () => {
     if (!editingRoom?.id) return;
