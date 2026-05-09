@@ -144,22 +144,22 @@ function BookingContent({ roomId }: { roomId: string }) {
   if (loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">LOADING...</div>;
 
   return (
-      <div className="h-[100dvh] bg-slate-50 text-slate-900 flex flex-col md:flex-row overflow-hidden font-sans">
+      <div className="h-[100dvh] bg-slate-50 text-slate-900 flex flex-col lg:flex-row overflow-hidden font-sans relative">
         
         {/* 1. ส่วนแผนผัง (ซ้าย) */}
-        <div className="flex-1 relative p-0 md:p-10 flex flex-col items-center w-full">
-          <div className="w-full max-w-4xl flex flex-col items-center mb-2 md:mb-12 mt-2 md:mt-0 px-4">
+        <div className="flex-1 relative p-0 lg:p-10 flex flex-col items-center w-full min-h-0 pb-24 lg:pb-10">
+          <div className="w-full max-w-4xl flex flex-col items-center mb-2 lg:mb-12 mt-2 lg:mt-0 px-4 shrink-0">
              <div className="w-full h-2 bg-slate-300 rounded-full mb-2" />
-             <span className="text-xs md:text-sm font-bold tracking-widest text-slate-400">หน้าชั้นเรียน (กระดาน)</span>
+             <span className="text-xs lg:text-sm font-bold tracking-widest text-slate-400">หน้าชั้นเรียน (กระดาน)</span>
           </div>
   
           {/* สถานะที่นั่งด้านบน */}
-          <div className="flex gap-4 md:gap-6 text-xs md:text-sm font-bold mb-2 md:mb-6 px-4 shrink-0">
+          <div className="flex gap-4 lg:gap-6 text-xs lg:text-sm font-bold mb-2 lg:mb-6 px-4 shrink-0">
              <div className="flex items-center gap-2"><div className="w-5 h-5 bg-[#DEFF9A] border-2 border-[#4ade80] rounded-md" /> โต๊ะว่าง</div>
              <div className="flex items-center gap-2"><div className="w-5 h-5 bg-[#F1F5F9] border-2 border-[#CBD5E1] rounded-md" /> มีผู้จองแล้ว</div>
           </div>
   
-          <div className="w-full max-w-[1000px] flex flex-col flex-1 relative md:bg-white md:p-6 md:rounded-2xl md:border border-slate-200 overflow-hidden">
+          <div className="w-full max-w-[1000px] flex flex-col flex-1 relative lg:bg-white lg:p-6 lg:rounded-2xl lg:border border-slate-200 overflow-hidden min-h-0">
             <ClassroomCanvas 
               initialLayout={room.layout_config} 
               bookings={bookings} 
@@ -170,45 +170,45 @@ function BookingContent({ roomId }: { roomId: string }) {
         </div>
   
         {/* 2. เมนูรายละเอียดการจอง (ขวา) */}
-        <div className="w-full md:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-20 border-t md:border-t-0 md:border-l border-slate-200">
+        <div className="fixed bottom-0 left-0 w-full lg:static lg:w-[380px] shrink-0 bg-white text-slate-900 flex flex-col z-40 border-t lg:border-t-0 lg:border-l border-slate-200 pb-[env(safe-area-inset-bottom)] lg:pb-0 shadow-[0_-10px_30px_rgba(0,0,0,0.1)] lg:shadow-none">
           {/* ซ่อน Header BOOKING SUMMARY บนมือถือเพื่อประหยัดพื้นที่ */}
-          <div className="hidden md:flex bg-slate-900 text-white p-4 md:p-6 text-sm md:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
+          <div className="hidden lg:flex bg-slate-900 text-white p-4 lg:p-6 text-sm lg:text-lg font-black tracking-widest uppercase items-center gap-3 relative overflow-hidden shrink-0">
              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-             <svg className="w-5 h-5 md:w-6 md:h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+             <svg className="w-5 h-5 lg:w-6 lg:h-6 text-red-500 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
              <span className="relative z-10">BOOKING SUMMARY</span>
           </div>
   
-          <div className="p-3 md:p-6 flex-grow flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-3 md:gap-0 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] md:shadow-none relative z-30">
+          <div className="p-3 lg:p-6 flex-grow flex flex-row lg:flex-col items-center lg:items-start justify-between lg:justify-start gap-3 lg:gap-0 relative z-30">
              
              {/* ปุ่ม Back สำหรับมือถือ แบบเล็กๆ */}
-             <button onClick={() => router.push('/')} className="md:hidden flex items-center justify-center p-3 text-slate-400 hover:text-slate-900 transition-colors bg-slate-100 rounded-lg shrink-0">
+             <button onClick={() => router.push('/')} className="lg:hidden flex items-center justify-center p-3 text-slate-400 hover:text-slate-900 transition-colors bg-slate-100 rounded-lg shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
              </button>
 
-             <div className="flex flex-row md:flex-col items-center md:items-stretch md:mb-8 md:space-y-4 shrink-0 md:w-full gap-2 md:gap-0">
-                <div className="hidden md:flex justify-between border-b pb-2">
+             <div className="flex flex-row lg:flex-col items-center lg:items-stretch lg:mb-8 lg:space-y-4 shrink-0 lg:w-full gap-2 lg:gap-0">
+                <div className="hidden lg:flex justify-between border-b pb-2">
                    <span className="text-slate-400">ห้องเรียน</span>
                    <span className="font-bold text-slate-900">{room?.name || 'กำลังโหลด...'}</span>
                 </div>
-                <div className="flex flex-col md:flex-row md:justify-between items-center md:border-b md:pb-2 gap-0.5 md:gap-0">
-                   <span className="text-[10px] md:text-sm text-slate-500 md:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
-                   <span className="text-red-600 font-black text-xl md:text-xl leading-none">{selectedSeat || '-'}</span>
+                <div className="flex flex-col lg:flex-row lg:justify-between items-center lg:border-b lg:pb-2 gap-0.5 lg:gap-0">
+                   <span className="text-[10px] lg:text-sm text-slate-500 lg:text-slate-400 font-bold uppercase tracking-wider">โต๊ะที่เลือก</span>
+                   <span className="text-red-600 font-black text-xl lg:text-xl leading-none">{selectedSeat || '-'}</span>
                 </div>
-                <div className="hidden md:flex flex-col text-right md:text-left md:flex-row md:justify-between md:items-center md:pt-2">
-                   <span className="text-xs md:text-sm text-slate-500 md:text-slate-400 font-bold">ชื่อผู้จอง</span>
-                   <span className="font-bold text-slate-900 text-sm md:text-base">{studentName || '-'}</span>
+                <div className="hidden lg:flex flex-col text-right lg:text-left lg:flex-row lg:justify-between lg:items-center lg:pt-2">
+                   <span className="text-xs lg:text-sm text-slate-500 lg:text-slate-400 font-bold">ชื่อผู้จอง</span>
+                   <span className="font-bold text-slate-900 text-sm lg:text-base">{studentName || '-'}</span>
                 </div>
              </div>
   
              <button 
                onClick={confirmBooking}
                disabled={showOverlay}
-               className="flex-1 md:w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 md:py-4 px-2 md:px-0 rounded-lg font-bold text-sm md:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 whitespace-nowrap"
+               className="flex-1 lg:w-full shrink-0 bg-red-600 hover:bg-red-700 disabled:bg-slate-400 text-white py-3 lg:py-4 px-2 lg:px-0 rounded-lg font-bold text-sm lg:text-lg uppercase tracking-wide shadow-md shadow-red-600/20 transition-all hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0 whitespace-nowrap"
              >
                {showOverlay ? 'ยังไม่เปิดให้จอง' : 'ยืนยันการจอง'}
              </button>
              
-             <button onClick={() => router.push('/')} className="hidden md:flex mt-4 py-3 md:py-0 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
+             <button onClick={() => router.push('/')} className="hidden lg:flex mt-4 py-3 lg:py-0 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-900 transition-colors items-center justify-center gap-2 w-full">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                 กลับหน้าหลัก
              </button>
