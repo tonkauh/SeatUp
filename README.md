@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+🪑 SeatUp: Real-time Classroom Seating System
 
-## Getting Started
+SeatUp is a real-time online seating reservation system designed to eliminate coordination chaos in classrooms. It focuses on speed, fairness, and precise spatial visualization.
 
-First, run the development server:
+🚀 The Viral Launch (Performance Metrics)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Upon its initial launch, the system experienced significant viral adoption with the following performance metrics:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Total Requests: 65,000+ requests within the first 24 hours.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Active Records: 1,000+ live booking transactions stored in the PostgreSQL database.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+System Stability: Maintained a 0% Error Rate and 100% Uptime during peak traffic spikes (1.5K requests per 5-minute window).
 
-## Learn More
+Execution Efficiency: Processed 65,000 requests with a total CPU time of only 56 seconds (average ~0.8ms/request).
 
-To learn more about Next.js, take a look at the following resources:
+🛠️ Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Frontend: Next.js 14 (App Router), Tailwind CSS, Lucide React
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Backend: Next.js Serverless Functions, Supabase Authentication
 
-## Deploy on Vercel
+Database: PostgreSQL (Supabase) with Real-time Subscriptions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Infrastructure: Vercel Edge Network & Observability Monitoring
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+✨ Key Features
+
+Real-time Synchronization: Leverages Supabase Real-time to ensure seat availability updates instantly without page refreshes.
+
+Spatial Grid Layout: Interactive classroom maps that mirror physical layouts for accurate seat selection.
+
+Scalable Architecture: Built to handle massive concurrent users through efficient connection pooling and optimized database queries.
+
+Responsive Experience: Fully optimized for seamless use across mobile and desktop devices.
+
+🛡️ Database & Security
+
+PostgreSQL Schema: Optimized relational schema maintaining a lean footprint (approx. ~26MB for 1,000+ records).
+
+Data Integrity: Implements UUIDs for Primary/Foreign keys to ensure security and horizontal scalability.
+
+Row-Level Security (RLS): (In-Progress) Architectural foundation laid for granular data access control, ensuring users can only modify their own reservations.
+
+📸 Monitoring & Insights
+
+(Insert your 65K Traffic Spike graph and 1K Table Records screenshot here to provide visual proof of performance.)
+
+👨‍💻 Developer
+
+Kittiphon Maneetan Computer Science Student at Assumption University
+
+Live Project: seatup.vercel.app
+
+Developed with ❤️ to bring order to classroom chaos.
