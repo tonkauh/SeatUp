@@ -44,7 +44,7 @@ Row-Level Security (RLS): (In-Progress) Architectural foundation laid for granul
 
 📸 Monitoring & Insights
 
-(Insert your 65K Traffic Spike graph and 1K Table Records screenshot here to provide visual proof of performance.)
+<img width="587" height="249" alt="Screenshot 2569-05-10 at 10 27 26" src="https://github.com/user-attachments/assets/79148eea-96b8-41f2-b416-ccc795f91bc7" />
 
 👨‍💻 Developer
 
