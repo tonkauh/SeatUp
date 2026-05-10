@@ -141,6 +141,20 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     }
   };
 
+  // 3. ฟังก์ชันยกเลิกการจองผ่านชื่อโต๊ะ (ใช้ในหน้าต่าง Editor แผนผัง)
+  const handleCancelBookingByDesk = async (deskLabel: string, silent: boolean = false) => {
+    if (!silent && !confirm(`ยืนยันที่จะยกเลิกการจองของโต๊ะ ${deskLabel} ใช่หรือไม่?`)) return false;
+    
+    const { error } = await supabase.from('bookings').delete().eq('room_id', room.id).eq('desk_id', deskLabel);
+    if (error) {
+      alert('ยกเลิกไม่สำเร็จ: ' + error.message);
+      return false;
+    } else {
+      fetchBookings();
+      return true;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col md:space-y-6 h-full relative">
       {/* โหมดมือถือ: ปุ่มลอยสำหรับเปิดเมนู Settings */}
@@ -214,6 +228,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
             initialLayout={room.layout_config} 
             bookings={bookings} // ส่ง bookings ไปให้ Admin เห็นชื่อคนจองบนแผนผังด้วย
             onSave={handleSave} 
+          onCancelBooking={handleCancelBookingByDesk}
             isReadOnly={false}  
           />
           

@@ -7,6 +7,7 @@ interface ClassroomCanvasProps {
   initialLayout: any[];
   bookings?: any[]; // เพิ่ม Prop รับข้อมูลการจอง
   onSave: (data: any) => void;
+  onCancelBooking?: (deskLabel: string, silent?: boolean) => Promise<boolean>;
   isReadOnly?: boolean;
 }
 
@@ -14,6 +15,7 @@ export default function ClassroomCanvas({
   initialLayout, 
   bookings = [], // กำหนดค่าเริ่มต้นเป็นอาเรย์ว่าง
   onSave, 
+  onCancelBooking,
   isReadOnly = false 
 }: ClassroomCanvasProps) {
   const [desks, setDesks] = useState(initialLayout || []);
@@ -296,6 +298,7 @@ export default function ClassroomCanvas({
   };
 
   const selectedDesk = desks.find((d: any) => d.id === selectedId);
+  const activeBooking = selectedDesk ? bookings.find((b: any) => b.desk_id === selectedDesk.label) : null;
 
   return (
     <div 
@@ -675,9 +678,30 @@ export default function ClassroomCanvas({
               </div>
             )}
   
+            {/* Cancel Booking Button */}
+            {activeBooking && (
+              <button
+                onClick={async () => {
+                  if (onCancelBooking) {
+                    await onCancelBooking(selectedDesk.label);
+                  }
+                }}
+                className="w-full mt-2 py-2.5 bg-orange-50 text-orange-600 font-bold rounded-lg hover:bg-orange-100 transition-colors text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg> ยกเลิกการจองของโต๊ะนี้
+              </button>
+            )}
+
             {/* Delete Button */}
             <button
-              onClick={() => {
+              onClick={async () => {
+                if (activeBooking) {
+                  const confirmed = await showConfirm(`โต๊ะ ${selectedDesk.label} มีคุณ ${activeBooking.user_name} จองอยู่\nหากลบโต๊ะ การจองจะถูกยกเลิกด้วย ยืนยันลบหรือไม่?`);
+                  if (!confirmed) return;
+                  if (onCancelBooking) {
+                    await onCancelBooking(selectedDesk.label, true);
+                  }
+                }
                 const newDesks = desks.filter((d: any) => d.id !== selectedDesk.id);
                 setDesks(newDesks);
                 setSelectedId(null);

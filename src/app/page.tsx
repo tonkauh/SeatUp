@@ -28,7 +28,31 @@ function PageContent() {
 
   useEffect(() => {
     document.title = "SeatUp";
+
+    // กู้คืนสถานะหน้าจอและข้อมูลห้องจาก sessionStorage เมื่อผู้ใช้กดรีเฟรชหน้าเว็บ
+    const savedView = sessionStorage.getItem('seatup_view');
+    const savedRoom = sessionStorage.getItem('seatup_room');
+    if (savedView) {
+      setView(savedView as typeof view);
+    }
+    if (savedRoom) {
+      try {
+        setEditingRoom(JSON.parse(savedRoom));
+      } catch (error) {
+        console.error("Failed to parse saved room data", error);
+      }
+    }
   }, []);
+
+  // บันทึกสถานะลง sessionStorage ทุกครั้งที่มีการเปลี่ยนหน้าหรือแก้ไขข้อมูลห้อง
+  useEffect(() => {
+    sessionStorage.setItem('seatup_view', view);
+    if (editingRoom) {
+      sessionStorage.setItem('seatup_room', JSON.stringify(editingRoom));
+    } else {
+      sessionStorage.removeItem('seatup_room');
+    }
+  }, [view, editingRoom]);
 
   const refetchEditingRoom = async () => {
     if (!editingRoom?.id) return;
