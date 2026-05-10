@@ -5,6 +5,10 @@ import dynamic from 'next/dynamic';
 
 const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { ssr: false });
 
+// การตั้งค่าระบบเชื่อมต่อฐานข้อมูล
+const USE_REALTIME = false; // ปิดเพื่อใช้ Smart Polling (ลดจำนวน Connection)
+const POLLING_INTERVAL = 30000; // 30 วินาที
+
 export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any, onDataChange: () => Promise<void>, onGoHome?: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('editor');
@@ -42,19 +46,28 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   useEffect(() => {
     fetchBookings();
 
-    // เปิดใช้งาน Supabase Realtime สำหรับหน้า Dashboard แอดมิน
-    const channel = supabase
-      .channel(`admin_bookings_${room.id}_${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
-        setBookings(prev => [payload.new, ...prev]); // นำคนจองใหม่แทรกขึ้นด้านบนสุด
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
-        setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบข้อมูลที่โดนยกเลิกออกทันที
-      })
-      .subscribe();
+    let channel: any;
+    let intervalId: NodeJS.Timeout;
+
+    if (USE_REALTIME) {
+      // เปิดใช้งาน Supabase Realtime สำหรับหน้า Dashboard แอดมิน
+      channel = supabase
+        .channel(`admin_bookings_${room.id}_${Date.now()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
+          setBookings(prev => [payload.new, ...prev]); // นำคนจองใหม่แทรกขึ้นด้านบนสุด
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${room.id}` }, (payload) => {
+          setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบข้อมูลที่โดนยกเลิกออกทันที
+        })
+        .subscribe();
+    } else {
+      // ระบบ Smart Polling
+      intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [room.id]);
 

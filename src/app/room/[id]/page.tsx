@@ -10,6 +10,10 @@ const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), {
   loading: () => <div className="h-full w-full flex items-center justify-center bg-slate-800 text-slate-500">Loading Map...</div>
 });
 
+// การตั้งค่าระบบเชื่อมต่อฐานข้อมูล
+const USE_REALTIME = false; // ปิดเพื่อใช้ Smart Polling (ลดจำนวน Connection)
+const POLLING_INTERVAL = 30000; // 30 วินาที (30000 ms)
+
 // แยกเนื้อหาออกมาเพื่อสามารถเรียกใช้ useDialog ได้
 function BookingContent({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -29,6 +33,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
   useEffect(() => {
     let channel: any;
+    let intervalId: NodeJS.Timeout;
 
     const fetchData = async () => {
       const { data: roomData } = await supabase.from('rooms').select('*').or(`id.eq.${roomId},join_code.eq.${roomId.toUpperCase()}`).maybeSingle();
@@ -42,16 +47,21 @@ function BookingContent({ roomId }: { roomId: string }) {
         };
         await fetchBookings();
 
-        // ระบบดักจับ Real-time ยัดข้อมูลใส่ State เองโดยไม่ต้องดึงใหม่จากฐานข้อมูล
-        channel = supabase
-          .channel(`public:bookings:${roomData.id}-${Date.now()}`)
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
-            setBookings(prev => [...prev, payload.new]); // นำคนจองใหม่ต่อท้ายได้เลย
-          })
-          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
-            setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
-          })
-          .subscribe();
+        if (USE_REALTIME) {
+          // ระบบดักจับ Real-time ยัดข้อมูลใส่ State เองโดยไม่ต้องดึงใหม่จากฐานข้อมูล
+          channel = supabase
+            .channel(`public:bookings:${roomData.id}-${Date.now()}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
+              setBookings(prev => [...prev, payload.new]); // นำคนจองใหม่ต่อท้ายได้เลย
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings', filter: `room_id=eq.${roomData.id}` }, (payload) => {
+              setBookings(prev => prev.filter(b => b.id !== payload.old.id)); // ลบคนที่ยกเลิกออกทันที
+            })
+            .subscribe();
+        } else {
+          // ระบบ Smart Polling ดึงข้อมูลใหม่เป็นรอบๆ ตามเวลาที่ตั้งไว้
+          intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+        }
       }
       setLoading(false);
     };
@@ -59,6 +69,7 @@ function BookingContent({ roomId }: { roomId: string }) {
 
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [roomId]);
 
@@ -137,7 +148,12 @@ function BookingContent({ roomId }: { roomId: string }) {
       }
     } else {
       showAlert('จองที่นั่งสำเร็จ!');
-      setSelectedSeat(null); // ไม่ต้องรีเฟรชหน้าจอแล้ว เพราะ Realtime จะอัปเดตแผนผังให้เอง
+      
+      // จำลองเพิ่มที่นั่งบนหน้าจอให้ทันทีในโหมด Polling ป้องกันการกดซ้ำระหว่างรอรอบรีเฟรช
+      if (!USE_REALTIME) {
+        setBookings(prev => [...prev, { id: 'temp-' + Date.now(), desk_id: selectedSeat, user_name: studentName }]);
+      }
+      setSelectedSeat(null);
     }
   };
 
