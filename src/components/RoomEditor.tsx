@@ -10,12 +10,23 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('editor');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   
+  // แปลงเวลา ISO เป็น Format สำหรับ input date (YYYY-MM-DD)
+  const getLocalDate = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // แปลงเวลา ISO เป็น Format สำหรับ input time (HH:mm)
   const getLocalTime = (isoString?: string) => {
     if (!isoString) return '';
     const date = new Date(isoString);
     return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   };
+  const [startDate, setStartDate] = useState<string>(getLocalDate(room.start_time));
   const [startTime, setStartTime] = useState<string>(getLocalTime(room.start_time));
 
   // 1. ฟังก์ชันดึงข้อมูลผู้จอง
@@ -67,11 +78,13 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const handleSaveTime = async () => {
     try {
       let startTimestamp = null;
-      if (startTime) {
-        const now = new Date();
+      if (startDate && startTime) {
+        const [year, month, day] = startDate.split('-');
         const [hours, minutes] = startTime.split(':');
-        now.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0); // ตั้งเป็นเวลาของวันนี้
-        startTimestamp = now.toISOString();
+        const targetDate = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+        startTimestamp = targetDate.toISOString();
+      } else if (startDate || startTime) {
+        return alert('กรุณากรอกทั้งวันที่และเวลาให้ครบถ้วนครับ');
       }
 
       const { error } = await supabase
@@ -94,6 +107,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
         .update({ start_time: null })
         .eq('id', room.id);
       if (error) throw error;
+      setStartDate('');
       setStartTime('');
       alert('ยกเลิกการตั้งเวลาเปิดจองเรียบร้อยแล้ว!');
       await onDataChange();
@@ -165,13 +179,19 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
             </div>
             <div className="flex w-full md:w-auto items-center gap-2">
               <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white font-bold text-slate-700"
+              />
+              <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="flex-1 p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white font-bold text-slate-700"
+                className="w-32 p-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white font-bold text-slate-700"
               />
               <button onClick={handleSaveTime} className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide shadow-sm">Save</button>
-              {startTime && (
+              {(startDate || startTime) && (
                 <button onClick={handleClearTime} className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-lg font-bold text-sm transition-colors uppercase tracking-wide border border-red-100">Clear</button>
               )}
             </div>
@@ -289,7 +309,14 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                   <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   ตั้งเวลาเปิดจอง
                 </label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col gap-2 mb-3">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-slate-300 text-base outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
+                  />
+                  <div className="flex gap-2">
                   <input
                     type="time"
                     value={startTime}
@@ -297,8 +324,9 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
                     className="flex-1 p-3 rounded-lg border border-slate-300 text-base outline-none focus:border-indigo-500 bg-white font-bold text-slate-700 shadow-inner"
                   />
                   <button onClick={() => { handleSaveTime(); setShowMobileMenu(false); }} className="bg-slate-900 text-white px-5 rounded-lg font-bold uppercase shadow-md">Save</button>
+                  </div>
                 </div>
-                {startTime && (
+                {(startDate || startTime) && (
                   <button onClick={() => { handleClearTime(); setShowMobileMenu(false); }} className="w-full py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg uppercase tracking-wider text-sm border border-red-100 transition-colors">
                     ยกเลิกการตั้งเวลา
                   </button>

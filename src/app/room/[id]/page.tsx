@@ -223,8 +223,14 @@ function BookingContent({ roomId }: { roomId: string }) {
               <p className="text-slate-300 mb-6 md:mb-8 text-sm md:text-lg drop-shadow-md">ระบบจะเปิดให้เข้าจองที่นั่งได้ในอีก</p>
   
               {timeLeft && (
-                <div className="flex gap-2 md:gap-4 text-white text-6xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-                  {timeLeft.h > 0 && (
+                <div className="flex items-center justify-center flex-wrap gap-2 md:gap-4 text-white text-5xl md:text-8xl font-mono font-bold drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
+                  {timeLeft.d > 0 && (
+                    <div className="flex items-center gap-2 md:gap-4 mr-2 md:mr-4">
+                      <span>{timeLeft.d}</span>
+                      <span className="text-xl md:text-4xl text-slate-300 font-sans font-medium">วัน</span>
+                    </div>
+                  )}
+                  {(timeLeft.h > 0 || timeLeft.d > 0) && (
                     <>
                       <span>{timeLeft.h.toString().padStart(2, '0')}</span>
                       <span className="text-slate-500/80 -mt-1">:</span>

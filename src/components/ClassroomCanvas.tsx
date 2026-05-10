@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react';
 import { useDialog } from '@/components/DialogContext';
-import { Stage, Layer, Rect, Text, Group, Path } from 'react-konva';
+import { Stage, Layer, Rect, Text, Group, Path, Transformer } from 'react-konva';
 
 interface ClassroomCanvasProps {
   initialLayout: any[];
@@ -24,7 +24,10 @@ export default function ClassroomCanvas({
   const [scale, setScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 });
   const lastDist = useRef<number>(0);
-  const [editingDesk, setEditingDesk] = useState<any>(null); // State สำหรับโต๊ะที่ถูกคลิกตั้งค่า
+  
+  const [selectedId, setSelectedId] = useState<string | null>(null); // State สำหรับโต๊ะที่ถูกเลือก (Canva style)
+  const stageRef = useRef<any>(null);
+  const trRef = useRef<any>(null);
   const { showAlert, showConfirm } = useDialog();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   
@@ -57,6 +60,17 @@ export default function ClassroomCanvas({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, [initialLayout]);
+
+  // ผูก Transformer เข้ากับวัตถุที่ถูกเลือก
+  useEffect(() => {
+    if (!isReadOnly && selectedId && trRef.current && stageRef.current) {
+      const node = stageRef.current.findOne('#' + selectedId);
+      if (node) {
+        trRef.current.nodes([node]);
+        trRef.current.getLayer().batchDraw();
+      }
+    }
+  }, [selectedId, desks, isReadOnly]);
 
   // ระบบ Pinch-to-Zoom สำหรับหน้าจอมือถือ (ใช้ 2 นิ้วซูม)
   const getDistance = (p1: any, p2: any) => {
@@ -117,6 +131,13 @@ export default function ClassroomCanvas({
   const deskWidth = 80;
   const deskHeight = 60; // ปรับจาก 55 เป็น 60 เพื่อให้หาร 20 ลงตัว (พอดี 3 ช่อง Grid)
 
+  // ฟังก์ชันอัปเดตข้อมูลโต๊ะ/สิ่งของแบบรวดเร็ว
+  const updateDesk = (id: string, changes: any) => {
+    const newDesks = desks.map((d: any) => d.id === id ? { ...d, ...changes } : d);
+    setDesks(newDesks);
+    onSave(newDesks); // บันทึกลงฐานข้อมูลอัตโนมัติ
+  };
+
   // อัปเดตตำแหน่งเมื่อลากโต๊ะเสร็จ
   const handleDragEnd = (id: string, e: any) => {
     if (isReadOnly) return;
@@ -125,16 +146,22 @@ export default function ClassroomCanvas({
         const newX = useMagnetGrid ? Math.round(e.target.x() / 20) * 20 : e.target.x();
         const newY = useMagnetGrid ? Math.round(e.target.y() / 20) * 20 : e.target.y();
 
+        const currentDesk = desks.find((d: any) => d.id === id);
+        const cWidth = currentDesk?.width || deskWidth;
+        const cHeight = currentDesk?.height || deskHeight;
+
         // เช็กการซ้อนทับ (Collision Detection)
         const margin = 10; // ระยะยืดหยุ่นยอมให้ขอบซ้อนทับกันได้ 10px
         const isColliding = desks.some((d: any) => {
           if (d.id === id) return false; // ไม่เช็กตัวเอง
+          const dWidth = d.width || deskWidth;
+          const dHeight = d.height || deskHeight;
           // ค้นหาว่าขอบของโต๊ะทับกันหรือไม่ (หักลบ margin ออก)
           return (
-            newX + margin < d.x + deskWidth - margin &&
-            newX + deskWidth - margin > d.x + margin &&
-            newY + margin < d.y + deskHeight - margin &&
-            newY + deskHeight - margin > d.y + margin
+            newX + margin < d.x + dWidth - margin &&
+            newX + cWidth - margin > d.x + margin &&
+            newY + margin < d.y + dHeight - margin &&
+            newY + cHeight - margin > d.y + margin
           );
         });
 
@@ -169,13 +196,21 @@ export default function ClassroomCanvas({
         
         // หาตำแหน่งที่ว่างเพื่อไม่ให้โต๊ะเกิดมาทับกัน
         while (isOccupied) {
-          isOccupied = desks.some((d: any) => (
-            newX + margin < d.x + deskWidth - margin && newX + deskWidth - margin > d.x + margin &&
-            newY + margin < d.y + deskHeight - margin && newY + deskHeight - margin > d.y + margin
-          ));
+          isOccupied = desks.some((d: any) => {
+            const dWidth = d.width || deskWidth;
+            const dHeight = d.height || deskHeight;
+            return (
+              newX + margin < d.x + dWidth - margin && newX + deskWidth - margin > d.x + margin &&
+              newY + margin < d.y + dHeight - margin && newY + deskHeight - margin > d.y + margin
+            )
+          });
           if (isOccupied) {
-            newX += 20;
-            newY += 20;
+            newX += deskWidth + 20; // เลื่อนหาที่ว่างไปทางขวาทีละช่วงโต๊ะ
+            // ถ้าหาที่ว่างไปจนสุดขอบกระดาน (ประมาณ 1000px) ให้ขึ้นบรรทัดใหม่
+            if (newX > 1000) {
+              newX = 60;
+              newY += deskHeight + 20;
+            }
           }
         }
 
@@ -260,6 +295,8 @@ export default function ClassroomCanvas({
     }
   };
 
+  const selectedDesk = desks.find((d: any) => d.id === selectedId);
+
   return (
     <div 
       ref={containerRef}
@@ -319,6 +356,7 @@ export default function ClassroomCanvas({
       </div>
       
       <Stage 
+        ref={stageRef}
         width={dimensions.width} 
         height={dimensions.height}
         scaleX={scale}
@@ -330,6 +368,12 @@ export default function ClassroomCanvas({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
+        onPointerDown={(e) => {
+          // คลายการเลือกวัตถุเมื่อคลิกที่พื้นหลังกระดาน
+          if (e.target === e.target.getStage()) {
+            setSelectedId(null);
+          }
+        }}
         onDragEnd={(e) => {
           if (e.target === e.target.getStage()) {
             setStagePos({ x: e.target.x(), y: e.target.y() });
@@ -343,6 +387,9 @@ export default function ClassroomCanvas({
             const isBooked = !!booking;
             const ownerName = booking?.user_name || '';
 
+            const currentWidth = desk.width || deskWidth;
+            const currentHeight = desk.height || deskHeight;
+
             // กำหนดสีตามสถานะ (โต๊ะปกติ vs สิ่งของ)
             let fillColor = isBooked ? '#F1F5F9' : '#DEFF9A'; 
             let strokeColor = isBooked ? '#CBD5E1' : '#4ade80';
@@ -354,8 +401,11 @@ export default function ClassroomCanvas({
             return (
               <Group
                 key={desk.id}
+                id={desk.id}
                 x={desk.x}
                 y={desk.y}
+                width={currentWidth}
+                height={currentHeight}
                 draggable={!isReadOnly && !desk.isLocked} // ลากไม่ได้ถ้าถูกล็อก หรือเป็นโหมด ReadOnly
                 dragBoundFunc={function(this: any, pos) {
                   let logicalX = (pos.x - stagePos.x) / scale;
@@ -372,6 +422,62 @@ export default function ClassroomCanvas({
                   };
                 }}
                 onDragEnd={(e) => handleDragEnd(desk.id, e)}
+                onTransform={(e) => {
+                  const node = e.target as any; // แปลงเป็น any เพื่อแก้ปัญหา TypeScript หา findOne ไม่เจอ
+                  const scaleX = node.scaleX();
+                  const scaleY = node.scaleY();
+                  
+                  // รีเซ็ตสเกลกลับเป็น 1 ทันที เพื่อไม่ให้ฟอนต์หรือเส้นขอบยืดเบี้ยว
+                  node.scaleX(1);
+                  node.scaleY(1);
+
+                  const newWidth = Math.max(20, node.width() * scaleX);
+                  const newHeight = Math.max(20, node.height() * scaleY);
+
+                  node.width(newWidth);
+                  node.height(newHeight);
+
+                  const bgRect = node.findOne('.bg-rect');
+                  const centerText = node.findOne('.center-text');
+                  const labelText = node.findOne('.label-text');
+
+                  // อัปเดตขนาดชิ้นส่วนข้างในแบบเรียลไทม์
+                  if (bgRect) { bgRect.width(newWidth); bgRect.height(newHeight); }
+                  if (centerText) { centerText.width(newWidth); centerText.height(newHeight); }
+                  if (labelText) { labelText.x(newWidth - 25); }
+                }}
+                onTransformEnd={(e) => {
+                  const node = e.target as any;
+
+                  let newX = node.x();
+                  let newY = node.y();
+                  let newWidth = Math.max(20, node.width());
+                  let newHeight = Math.max(20, node.height());
+
+                  if (useMagnetGrid) {
+                    newX = Math.round(newX / 20) * 20;
+                    newY = Math.round(newY / 20) * 20;
+                    newWidth = Math.round(newWidth / 20) * 20;
+                    newHeight = Math.round(newHeight / 20) * 20;
+                    
+                    // ปรับภาพให้ลง Grid ทันทีก่อน React จะ re-render ให้สมูท
+                    node.position({ x: newX, y: newY });
+                    node.width(newWidth);
+                    node.height(newHeight);
+                    
+                    // ปรับขนาดชิ้นส่วนด้านในให้ตรงกับขนาดที่ลง Grid ด้วย ป้องกันภาพเพี้ยน
+                    const bgRect = node.findOne('.bg-rect');
+                    const centerText = node.findOne('.center-text');
+                    const labelText = node.findOne('.label-text');
+                    if (bgRect) { bgRect.width(newWidth); bgRect.height(newHeight); }
+                    if (centerText) { centerText.width(newWidth); centerText.height(newHeight); }
+                    if (labelText) { labelText.x(newWidth - 25); }
+
+                    node.getLayer()?.batchDraw();
+                  }
+
+                  updateDesk(desk.id, { x: newX, y: newY, width: newWidth, height: newHeight, rotation: node.rotation() });
+                }}
                 onClick={() => {
                   if (isReadOnly) {
                     if (desk.isObject) return showAlert('นี่คือสิ่งของ ไม่สามารถจองได้ครับ');
@@ -381,7 +487,7 @@ export default function ClassroomCanvas({
                       showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }
                   } else {
-                    setEditingDesk({ ...desk }); // เปิด Modal ตั้งค่าโต๊ะ
+                    setSelectedId(desk.id); // เลือกวัตถุเพื่อยืดหด
                   }
                 }}
                 onTap={() => { // เพิ่ม onTap สำหรับรองรับบนมือถือ
@@ -393,7 +499,7 @@ export default function ClassroomCanvas({
                       showAlert(`โต๊ะหมายเลข ${desk.label} ถูกจองโดยคุณ ${ownerName} แล้วครับ`);
                     }
                   } else {
-                    setEditingDesk({ ...desk });
+                    setSelectedId(desk.id);
                   }
                 }}
                 // เปลี่ยน Mouse cursor เมื่อชี้
@@ -412,8 +518,9 @@ export default function ClassroomCanvas({
               >
                 {/* ตัวโต๊ะ */}
                 <Rect
-                  width={deskWidth}
-                  height={deskHeight}
+                  name="bg-rect"
+                  width={currentWidth}
+                  height={currentHeight}
                   fill={fillColor}
                   stroke={strokeColor}
                   strokeWidth={2}
@@ -440,8 +547,9 @@ export default function ClassroomCanvas({
                 {/* หมายเลขโต๊ะ (ซ่อนมุมบนขวาถ้าเป็นสิ่งของ) */}
                 {!desk.isObject && (
                   <Text
+                    name="label-text"
                     text={desk.label}
-                    x={deskWidth - 25} // ชิดมุมขวาบน
+                    x={currentWidth - 25} // ชิดมุมขวาบน
                     y={5}
                     fontSize={10}
                     fontStyle="bold"
@@ -453,11 +561,13 @@ export default function ClassroomCanvas({
 
                 {/* ชื่อผู้จอง หรือชื่อสิ่งของ (แสดงตรงกลางโต๊ะ) */}
                 <Text
+                  name="center-text"
                   text={desk.isObject ? desk.label : (isBooked ? ownerName : 'ว่าง')} 
-                  width={deskWidth - 10} // เว้นขอบ
-                  height={deskHeight - 15}
-                  x={5}
-                  y={12} // ขยับลงมาหน่อย
+                  width={currentWidth}
+                  height={currentHeight}
+                  x={0}
+                  y={0}
+                  padding={10}
                   align="center"
                   verticalAlign="middle"
                   fontSize={12}
@@ -472,93 +582,111 @@ export default function ClassroomCanvas({
               </Group>
             );
           })}
+
+          {/* กรอบ Transformer (จุดจับยืดหดรอบวัตถุ) */}
+          {!isReadOnly && selectedId && selectedDesk && !selectedDesk.isLocked && (
+            <Transformer
+              ref={trRef}
+              flipEnabled={false}
+              rotateEnabled={false} // ปิดหมุนไปก่อนเพื่อความเรียบร้อยของห้อง
+              boundBoxFunc={(oldBox, newBox) => {
+                // ป้องกันไม่ให้ย่อจนเล็กกว่า 20px
+                if (Math.abs(newBox.width) < 20 || Math.abs(newBox.height) < 20) return oldBox;
+                return newBox;
+              }}
+            />
+          )}
         </Layer>
       </Stage>
 
-      {/* Modal ตั้งค่าโต๊ะ (โหมด Editor) */}
-      {!isReadOnly && editingDesk && (
+      {/* Panel ตั้งค่าวัตถุ (โหมด Editor แบบ Floating Panel) */}
+      {!isReadOnly && selectedDesk && (
         <div 
-          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          className="absolute bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-white p-4 md:p-5 rounded-2xl shadow-2xl border border-slate-200 w-[92%] max-w-[340px] max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4"
           onPointerDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
         >
-          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-sm border border-slate-200">
-            <h3 className="text-lg font-bold mb-4 text-slate-900 uppercase border-b border-slate-100 pb-2 flex items-center gap-2">
-              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> ตั้งค่าวัตถุ
+          <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              ตั้งค่าวัตถุ
             </h3>
+            <button onClick={() => setSelectedId(null)} className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 p-1.5 rounded-full transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ชื่อโต๊ะ / สิ่งของ</label>
+              <input
+                type="text"
+                value={selectedDesk.label}
+                onChange={(e) => updateDesk(selectedDesk.id, { label: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 font-bold text-slate-800 text-sm transition-colors"
+              />
+            </div>
             
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 block">ชื่อโต๊ะ / สิ่งของ</label>
-                <input
-                  type="text"
-                  value={editingDesk.label}
-                  onChange={(e) => setEditingDesk({...editingDesk, label: e.target.value})}
-                  className="w-full p-2.5 border border-slate-300 rounded-lg outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors"
-                />
+            {/* Checkboxes */}
+            <label className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+              <input
+                type="checkbox"
+                checked={selectedDesk.isLocked || false}
+                onChange={(e) => updateDesk(selectedDesk.id, { isLocked: e.target.checked })}
+                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="text-xs font-bold text-slate-800">ล็อกตำแหน่ง (ป้องกันการเผลอขยับ)</div>
               </div>
-              
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={editingDesk.isLocked || false}
-                  onChange={(e) => setEditingDesk({...editingDesk, isLocked: e.target.checked})}
-                  className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> ล็อกตำแหน่ง
-                  </div>
-                  <div className="text-xs text-slate-400">ป้องกันการเผลอลากขยับ</div>
+            </label>
+  
+            <label className="flex items-center gap-3 p-2.5 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+              <input
+                type="checkbox"
+                checked={selectedDesk.isObject || false}
+                onChange={(e) => updateDesk(selectedDesk.id, { isObject: e.target.checked })}
+                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="text-xs font-bold text-slate-800">ตั้งเป็นสิ่งของ (ผู้ใช้จะจองไม่ได้)</div>
+              </div>
+            </label>
+  
+            {selectedDesk.isObject && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">ความกว้าง (Width)</label>
+                  <input
+                    type="number"
+                    value={Math.round(selectedDesk.width || deskWidth)}
+                    onChange={(e) => updateDesk(selectedDesk.id, { width: parseInt(e.target.value) || 80 })}
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 font-bold text-slate-800 text-sm transition-colors"
+                  />
                 </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={editingDesk.isObject || false}
-                  onChange={(e) => setEditingDesk({...editingDesk, isObject: e.target.checked})}
-                  className="w-5 h-5 text-red-600 rounded focus:ring-red-500 cursor-pointer"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> เป็นสิ่งของตกแต่ง
-                  </div>
-                  <div className="text-xs text-slate-400">ผู้ใช้จะไม่สามารถจองได้</div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">ความสูง (Height)</label>
+                  <input
+                    type="number"
+                    value={Math.round(selectedDesk.height || deskHeight)}
+                    onChange={(e) => updateDesk(selectedDesk.id, { height: parseInt(e.target.value) || 60 })}
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 font-bold text-slate-800 text-sm transition-colors"
+                  />
                 </div>
-              </label>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  const newDesks = desks.filter((d: any) => d.id !== editingDesk.id);
-                  setDesks(newDesks);
-                  setEditingDesk(null);
-                  onSave(newDesks); // บันทึกลงฐานข้อมูลทันทีเมื่อกดลบ
-                }}
-                className="px-4 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors mr-auto text-sm uppercase"
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setEditingDesk(null)}
-                className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors text-sm uppercase"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const newDesks = desks.map((d: any) => d.id === editingDesk.id ? editingDesk : d);
-                  setDesks(newDesks);
-                  setEditingDesk(null);
-                  onSave(newDesks); // บันทึกลงฐานข้อมูลทันทีเมื่อแก้ไข
-                }}
-                className="px-5 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors text-sm uppercase"
-              >
-                Save
-              </button>
-            </div>
+              </div>
+            )}
+  
+            {/* Delete Button */}
+            <button
+              onClick={() => {
+                const newDesks = desks.filter((d: any) => d.id !== selectedDesk.id);
+                setDesks(newDesks);
+                setSelectedId(null);
+                onSave(newDesks);
+              }}
+              className="w-full mt-2 py-2.5 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> ลบวัตถุนี้
+            </button>
           </div>
         </div>
       )}
