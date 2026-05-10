@@ -602,7 +602,7 @@ export default function ClassroomCanvas({
       {/* Panel ตั้งค่าวัตถุ (โหมด Editor แบบ Floating Panel) */}
       {!isReadOnly && selectedDesk && (
         <div 
-          className="absolute bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-white p-4 md:p-5 rounded-2xl shadow-2xl border border-slate-200 w-[92%] max-w-[340px] max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4"
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 md:bottom-auto md:top-4 md:left-auto md:right-4 md:translate-x-0 z-40 bg-white p-4 md:p-5 rounded-2xl shadow-2xl border border-slate-200 w-[92%] max-w-[340px] max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4"
           onPointerDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
         >
