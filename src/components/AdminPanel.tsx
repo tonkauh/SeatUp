@@ -4,10 +4,12 @@ import { useState } from 'react';
 
 export default function AdminPanel({ onCreated }: { onCreated: (room: any) => void }) {
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const createRoom = async () => {
     if (!name.trim()) return alert('กรุณาตั้งชื่อห้องก่อนครับ');
+    if (!password.trim()) return alert('กรุณาตั้งรหัสผ่านสำหรับผู้ดูแลก่อนครับ');
     setLoading(true);
     
     // สุ่มรหัส 6 หลัก
@@ -24,6 +26,7 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
       .insert([{ 
         name: name, 
         join_code: code, 
+        password: password,
         layout_config: defaultLayout 
       }])
       .select()
@@ -31,7 +34,7 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
 
     if (error) {
       // แก้จุดที่แดง: ตรวจสอบว่า error มีจริงไหมก่อนเข้าถึง .message
-      alert('พบปัญหา: ' + (error.message || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้'));
+      alert('พบปัญหา: ' + (error.message || 'ไม่สามารถเชื่อมต่อฐานข้อมูลได้') + '\n\n(อย่าลืมไปเพิ่มคอลัมน์ password ชนิด text ใน Supabase นะครับ)');
     } else if (data) {
       onCreated(data); 
     }
@@ -52,6 +55,13 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="ชื่อห้อง (เช่น Com Lab 1)"
+          className="w-full p-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none text-center font-bold text-slate-900 transition-all text-lg"
+        />
+        <input 
+          type="text" 
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="ตั้งรหัสผ่าน (ใช้สำหรับเข้าระบบจัดการ)"
           className="w-full p-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none text-center font-bold text-slate-900 transition-all text-lg"
         />
         <button 

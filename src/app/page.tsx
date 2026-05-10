@@ -20,6 +20,7 @@ function PageContent() {
   const [joinCode, setJoinCode] = useState('');
   const [studentNameForJoin, setStudentNameForJoin] = useState('');
   const [manageCode, setManageCode] = useState(''); // รหัสสำหรับเข้าดู Dashboard
+  const [managePassword, setManagePassword] = useState(''); // รหัสผ่านสำหรับจัดการ
   const { showAlert } = useDialog();
   const [showDonation, setShowDonation] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -240,21 +241,37 @@ function PageContent() {
         {view === 'host_manage' && (
           <div className="max-w-md mx-auto text-center mt-10 md:mt-20 bg-white p-6 md:p-10 border border-slate-200 rounded-xl shadow-sm animate-in fade-in duration-500">
             <h2 className="text-2xl font-bold mb-2 text-slate-900">เข้าสู่ระบบจัดการ</h2>
-            <p className="text-slate-500 mb-6 text-sm">กรอกรหัสห้อง (Join Code) 6 หลัก</p>
-            <input 
-              type="text" 
-              maxLength={6}
-              value={manageCode}
-              onChange={(e) => setManageCode(e.target.value.toUpperCase())}
-              className="w-full text-center text-3xl md:text-4xl font-mono py-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none transition-all mb-8 uppercase text-slate-900"
-              placeholder="XXXXXX"
-            />
+            <p className="text-slate-500 mb-6 text-sm">กรอกรหัสห้อง (Join Code) 6 หลัก และรหัสผ่าน</p>
+            <div className="space-y-4 mb-8">
+              <input 
+                type="text" 
+                maxLength={6}
+                value={manageCode}
+                onChange={(e) => setManageCode(e.target.value.toUpperCase())}
+                className="w-full text-center text-3xl md:text-4xl font-mono py-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none transition-all uppercase text-slate-900"
+                placeholder="รหัสห้อง (XXXXXX)"
+              />
+              <input 
+                type="password" 
+                value={managePassword}
+                onChange={(e) => setManagePassword(e.target.value)}
+                className="w-full text-center text-xl font-mono py-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none transition-all text-slate-900"
+                placeholder="รหัสผ่านผู้ดูแล"
+              />
+            </div>
             <button 
                onClick={async () => {
+                 if (!manageCode.trim() || !managePassword.trim()) {
+                   return showAlert('กรุณากรอกรหัสห้องและรหัสผ่านให้ครบถ้วน');
+                 }
                  const { data } = await supabase.from('rooms').select('*').eq('join_code', manageCode).single();
                  if (data) {
-                   setEditingRoom(data);
-                   setView('editor');
+                   if (data.password === managePassword) {
+                     setEditingRoom(data);
+                     setView('editor');
+                   } else {
+                     showAlert('รหัสผ่านไม่ถูกต้องครับ');
+                   }
                  } else showAlert('ไม่พบรหัสห้องนี้ครับ กรุณาตรวจสอบอีกครั้ง');
                }}
                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-lg font-bold text-lg uppercase transition-colors"
