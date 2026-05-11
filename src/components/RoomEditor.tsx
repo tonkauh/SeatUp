@@ -159,8 +159,9 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     <div className="flex-1 flex flex-col md:space-y-6 h-full relative">
       {/* โหมดมือถือ: ปุ่มลอยสำหรับเปิดเมนู Settings */}
       <div className="md:hidden absolute top-4 right-4 z-50 flex gap-2">
-        <button onClick={() => setShowMobileMenu(true)} className="w-12 h-12 bg-white rounded-full shadow-lg border border-slate-200 flex items-center justify-center text-slate-900 focus:outline-none">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        <button onClick={() => setShowMobileMenu(true)} className="h-11 px-4 bg-white/90 backdrop-blur rounded-full shadow-lg border border-slate-200 flex items-center justify-center text-slate-900 focus:outline-none gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          <span className="font-bold text-sm pr-1">เมนู</span>
         </button>
       </div>
 
