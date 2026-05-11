@@ -9,7 +9,6 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
 
   const createRoom = async () => {
     if (!name.trim()) return alert('กรุณาตั้งชื่อห้องก่อนครับ');
-    if (!password.trim()) return alert('กรุณาตั้งรหัสผ่านสำหรับผู้ดูแลก่อนครับ');
     setLoading(true);
     
     // สุ่มรหัส 6 หลัก
@@ -61,7 +60,7 @@ export default function AdminPanel({ onCreated }: { onCreated: (room: any) => vo
           type="text" 
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="ตั้งรหัสผ่าน (ใช้สำหรับเข้าระบบจัดการ)"
+          placeholder="ตั้งรหัสผ่าน (ไม่บังคับ)"
           className="w-full p-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none text-center font-bold text-slate-900 transition-all text-lg"
         />
         <button 

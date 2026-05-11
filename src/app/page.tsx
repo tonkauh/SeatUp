@@ -241,7 +241,7 @@ function PageContent() {
         {view === 'host_manage' && (
           <div className="max-w-md mx-auto text-center mt-10 md:mt-20 bg-white p-6 md:p-10 border border-slate-200 rounded-xl shadow-sm animate-in fade-in duration-500">
             <h2 className="text-2xl font-bold mb-2 text-slate-900">เข้าสู่ระบบจัดการ</h2>
-            <p className="text-slate-500 mb-6 text-sm">กรอกรหัสห้อง (Join Code) 6 หลัก และรหัสผ่าน</p>
+            <p className="text-slate-500 mb-6 text-sm">กรอกรหัสห้อง (Join Code) 6 หลัก และรหัสผ่าน (ถ้ามี)</p>
             <div className="space-y-4 mb-8">
               <input 
                 type="text" 
@@ -256,17 +256,18 @@ function PageContent() {
                 value={managePassword}
                 onChange={(e) => setManagePassword(e.target.value)}
                 className="w-full text-center text-xl font-mono py-4 rounded-lg border-2 border-slate-200 focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 shadow-inner outline-none transition-all text-slate-900"
-                placeholder="รหัสผ่านผู้ดูแล"
+                placeholder="รหัสผ่านผู้ดูแล (ถ้ามี)"
               />
             </div>
             <button 
                onClick={async () => {
-                 if (!manageCode.trim() || !managePassword.trim()) {
-                   return showAlert('กรุณากรอกรหัสห้องและรหัสผ่านให้ครบถ้วน');
+                 if (!manageCode.trim()) {
+                   return showAlert('กรุณากรอกรหัสห้องให้ครบถ้วน');
                  }
                  const { data } = await supabase.from('rooms').select('*').eq('join_code', manageCode).single();
                  if (data) {
-                   if (data.password === managePassword) {
+                   const hasPassword = data.password && data.password.trim() !== '';
+                   if (!hasPassword || data.password === managePassword) {
                      setEditingRoom(data);
                      setView('editor');
                    } else {
