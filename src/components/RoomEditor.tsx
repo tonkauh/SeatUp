@@ -233,7 +233,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
           />
           
           <div className="hidden md:block mt-2 md:mt-6 text-center text-slate-400 text-xs md:text-sm pb-4 md:pb-0">
-            * ระบบจะบันทึกแผนผังอัตโนมัติทุกครั้งที่มีการเปลี่ยนแปลง *
+            * ระบบจะบันทึกแผนผังอัตโนมัติ (รอ 1.5 วินาทีหลังแก้ไขล่าสุด) *
           </div>
         </div>
       ) : (

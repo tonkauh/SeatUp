@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useDialog } from '@/components/DialogContext';
 import { Stage, Layer, Rect, Text, Group, Path, Transformer } from 'react-konva';
 
@@ -31,7 +31,8 @@ export default function ClassroomCanvas({
   const stageRef = useRef<any>(null);
   const trRef = useRef<any>(null);
   const { showAlert, showConfirm } = useDialog();
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [useMagnetGrid, setUseMagnetGrid] = useState(true); // สำหรับเปิด-ปิด Snap to Grid เวลาลาก
   const [showAutoLayoutModal, setShowAutoLayoutModal] = useState(false);
@@ -40,6 +41,25 @@ export default function ClassroomCanvas({
     desksPerRow: 5, // จำนวนโต๊ะต่อแถว (แนวนอน)
     deskType: 'single' as 'single' | 'double'
   });
+
+  // ฟังก์ชันบันทึกแบบหน่วงเวลา (Debounce) เพื่อลดจำนวน Request ตอนแก้ไข
+  const debouncedSave = useCallback((data: any) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      onSave(data);
+      setToast({ message: 'บันทึกแผนผังอัตโนมัติแล้ว', type: 'success' });
+      setTimeout(() => setToast(null), 2000);
+    }, 1500); // รอ 1.5 วินาทีหลังแก้ไขล่าสุดถึงจะยิง API
+  }, [onSave]);
+
+  useEffect(() => {
+    // Clear timeout เมื่อ component unmount ป้องกัน memory leak
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [debouncedSave]);
 
   useEffect(() => {
     setDesks(initialLayout || []);
@@ -137,7 +157,7 @@ export default function ClassroomCanvas({
   const updateDesk = (id: string, changes: any) => {
     const newDesks = desks.map((d: any) => d.id === id ? { ...d, ...changes } : d);
     setDesks(newDesks);
-    onSave(newDesks); // บันทึกลงฐานข้อมูลอัตโนมัติ
+    debouncedSave(newDesks); // บันทึกลงฐานข้อมูลแบบหน่วงเวลา
   };
 
   // อัปเดตตำแหน่งเมื่อลากโต๊ะเสร็จ
@@ -174,8 +194,8 @@ export default function ClassroomCanvas({
             e.target.position({ x: originalDesk.x, y: originalDesk.y });
             e.target.getLayer()?.batchDraw(); // สั่งให้วาดเฟรมใหม่เพื่อรีเฟรช UI ทันที
           }
-          setToastMessage('ไม่สามารถวางโต๊ะซ้อนทับกันได้ครับ');
-          setTimeout(() => setToastMessage(null), 3000); // แจ้งเตือน 3 วินาทีแล้วซ่อนเอง
+          setToast({ message: 'ไม่สามารถวางโต๊ะซ้อนทับกันได้ครับ', type: 'error' });
+          setTimeout(() => setToast(null), 3000); // แจ้งเตือน 3 วินาทีแล้วซ่อนเอง
           return;
         }
 
@@ -186,7 +206,7 @@ export default function ClassroomCanvas({
       return d;
     });
     setDesks(newDesks);
-    onSave(newDesks); // บันทึกลงฐานข้อมูลอัตโนมัติเมื่อลากเสร็จ
+    debouncedSave(newDesks); // บันทึกลงฐานข้อมูลแบบหน่วงเวลาเมื่อลากเสร็จ
   };
 
   // ฟังก์ชันเพิ่มโต๊ะใหม่ลงใน Canvas
@@ -307,9 +327,9 @@ export default function ClassroomCanvas({
       style={{ touchAction: 'none' }} // ป้องกันจอไหลตอนใช้นิ้วลากแผนผัง
     >
       {/* Toast แจ้งเตือนขนาดเล็ก */}
-      {toastMessage && (
-        <div className="absolute top-20 md:top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm animate-in fade-in slide-in-from-top-4 pointer-events-none">
-          {toastMessage}
+      {toast && (
+        <div className={`absolute top-20 md:top-4 left-1/2 -translate-x-1/2 z-[60] ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'} text-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm animate-in fade-in slide-in-from-top-4 pointer-events-none`}>
+          {toast.message}
         </div>
       )}
       
