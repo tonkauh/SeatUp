@@ -26,6 +26,18 @@ function PageContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [showHackNotification, setShowHackNotification] = useState(true); // แจ้งเตือนการแฮ็ค
+
+  useEffect(() => {
+    document.title = "SeatUp";
+
+    // ตั้ง timer ปิด notification เรื่องการแฮ็กอัตโนมัติหลังจาก 5 ชั่วโมง (18000000 ms)
+    const hackNotificationTimer = setTimeout(() => {
+      setShowHackNotification(false);
+    }, 5 * 60 * 60 * 1000); // 5 ชั่วโมง
+
+    return () => clearTimeout(hackNotificationTimer);
+  }, []);
 
   useEffect(() => {
     document.title = "SeatUp";
@@ -91,6 +103,35 @@ function PageContent() {
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 md:p-6 text-slate-900">
+        {/* แจ้งเตือนการแฮ็ค */}
+        {showHackNotification && (
+          <div className="fixed top-0 left-0 right-0 z-50 bg-red-50 border-b-2 border-red-400 shadow-lg animate-in slide-in-from-top duration-300">
+            <div className="max-w-6xl mx-auto px-4 md:px-6 py-4 md:py-6 flex items-start md:items-center justify-between gap-4">
+              <div className="flex items-start md:items-center gap-4 flex-1">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-red-400 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 md:mt-0">
+                  <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-red-900 font-bold text-sm md:text-base leading-relaxed">
+                    ⚠️ เนื่องจากเว็บไซต์ถูกแฮ็คเมื่อคืนทำให้ข้อมูลชุดก่อนๆหายไป รวมถึงข้อมูลการจองด้วย ขออภัยในความไม่สะดวก ทางเราจะแก้ไขปรับปรุงด้านความปลอดภัยให้มากขึ้น
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowHackNotification(false)}
+                className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 bg-red-200 hover:bg-red-300 text-red-700 rounded-full flex items-center justify-center transition-colors outline-none"
+                aria-label="ปิดแจ้งเตือน"
+              >
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Logo Section */}
         <div className="flex items-center justify-center gap-3 md:gap-4 mb-8 md:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 shrink-0 bg-slate-900 text-white rounded-2xl flex items-center justify-center transform -rotate-6 shadow-xl">
