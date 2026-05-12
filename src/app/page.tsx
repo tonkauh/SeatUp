@@ -26,7 +26,6 @@ function PageContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [showAnnouncement, setShowAnnouncement] = useState(true); // แจ้งเตือนเรื่องโควต้า
 
   useEffect(() => {
     document.title = "SeatUp";
@@ -96,28 +95,6 @@ function PageContent() {
   if (view === 'landing') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 md:p-6 text-slate-900">
-        {/* แจ้งเตือนโควต้าใกล้เต็ม */}
-        {showAnnouncement && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-2xl max-w-lg w-full text-center relative">
-              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner transform -rotate-3">
-                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-wide">ประกาศสำคัญจากทีมพัฒนา</h3>
-              <p className="text-slate-600 mb-8 leading-relaxed text-sm md:text-base text-left">
-                <strong>เรียนผู้ใช้ทุกท่าน:</strong> เนื่องจากระบบ SeatUp กำลังได้รับความนิยมเกินความคาดหมาย ทำให้โควต้าทรัพยากร (Edge Request Limit) ใกล้จะเต็มในเร็วๆ นี้ ซึ่งอาจส่งผลให้เว็บไซต์หยุดทำงานชั่วคราวในอนาคตอันใกล้ <br/><br/>
-                หากเกิดเหตุขัดข้องประการใด ต้องขออภัยมา ณ ที่นี้ด้วยครับ<br/>
-                <span className="text-slate-400 mt-2 block text-right">— ทีมพัฒนา SeatUp</span>
-              </p>
-              <button 
-                onClick={() => setShowAnnouncement(false)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-xl font-bold uppercase transition-colors tracking-widest shadow-md shadow-slate-900/20"
-              >
-                ทราบแล้ว
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Logo Section */}
         <div className="flex items-center justify-center gap-3 md:gap-4 mb-8 md:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
