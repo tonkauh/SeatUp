@@ -296,7 +296,7 @@ function PageContent() {
                 <p className="text-slate-400 text-sm mt-1 tracking-widest">รหัสเข้าร่วม (Join Code): <span className="font-mono font-bold text-white text-lg ml-1">{editingRoom.join_code}</span></p>
               </div>
             </div>
-            <RoomEditor room={editingRoom} onDataChange={refetchEditingRoom} onGoHome={() => { setView('landing'); setEditingRoom(null); }} />
+            <RoomEditor room={editingRoom} managePassword={managePassword} onDataChange={refetchEditingRoom} onGoHome={() => { setView('landing'); setEditingRoom(null); }} />
           </div>
         )}
 

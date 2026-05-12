@@ -9,7 +9,7 @@ const ClassroomCanvas = dynamic(() => import('@/components/ClassroomCanvas'), { 
 const USE_REALTIME = false; // ปิดเพื่อใช้ Smart Polling (ลดจำนวน Connection)
 const POLLING_INTERVAL = 30000; // 30 วินาที
 
-export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any, onDataChange: () => Promise<void>, onGoHome?: () => void }) {
+export default function RoomEditor({ room, managePassword = '', onDataChange, onGoHome }: { room: any, managePassword?: string, onDataChange: () => Promise<void>, onGoHome?: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'editor'>('editor');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -87,13 +87,15 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   // แก้ไขตรงนี้: ปรับ parameter ให้เป็น any หรือ any[] เพื่อรับค่าจาก Canvas
   const handleSave = async (updatedData: any) => {
     try {
-      // ในโหมด Editor ค่าที่ส่งกลับมาควรเป็น Array ของโต๊ะ (Layout)
-      const { error } = await supabase
-        .from('rooms')
-        .update({ layout_config: updatedData })
-        .eq('id', room.id);
+      // ส่งไปให้ RPC จัดการ แทนการยิงคำสั่ง Update ตรงๆ ที่ถูกบล็อกด้วย RLS
+      const { data, error } = await supabase.rpc('admin_update_room_layout', {
+        p_room_id: room.id,
+        p_layout: updatedData,
+        p_password: managePassword
+      });
 
       if (error) throw error;
+      if (data === false) throw new Error('ไม่มีสิทธิ์แก้ไข (รหัสผ่านไม่ถูกต้อง)');
       await onDataChange(); // แจ้งให้ Parent component ดึงข้อมูลใหม่
     } catch (error: any) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
@@ -113,11 +115,13 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
         return alert('กรุณากรอกทั้งวันที่และเวลาให้ครบถ้วนครับ');
       }
 
-      const { error } = await supabase
-        .from('rooms')
-        .update({ start_time: startTimestamp })
-        .eq('id', room.id);
+      const { data, error } = await supabase.rpc('admin_update_room_time', {
+        p_room_id: room.id,
+        p_start_time: startTimestamp,
+        p_password: managePassword
+      });
       if (error) throw error;
+      if (data === false) throw new Error('ไม่มีสิทธิ์แก้ไข (รหัสผ่านไม่ถูกต้อง)');
       alert('บันทึกเวลาเปิดจองสำเร็จ!');
       await onDataChange();
     } catch (error: any) {
@@ -128,11 +132,13 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   // ฟังก์ชันยกเลิกเวลาเปิดจอง
   const handleClearTime = async () => {
     try {
-      const { error } = await supabase
-        .from('rooms')
-        .update({ start_time: null })
-        .eq('id', room.id);
+      const { data, error } = await supabase.rpc('admin_update_room_time', {
+        p_room_id: room.id,
+        p_start_time: null,
+        p_password: managePassword
+      });
       if (error) throw error;
+      if (data === false) throw new Error('ไม่มีสิทธิ์แก้ไข (รหัสผ่านไม่ถูกต้อง)');
       setStartDate('');
       setStartTime('');
       alert('ยกเลิกการตั้งเวลาเปิดจองเรียบร้อยแล้ว!');
@@ -146,9 +152,14 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const handleDeleteBooking = async (bookingId: string) => {
     if (!confirm('ยืนยันที่จะยกเลิกการจองของโต๊ะนี้ใช่หรือไม่?')) return;
     
-    const { error } = await supabase.from('bookings').delete().eq('id', bookingId);
+    const { data, error } = await supabase.rpc('admin_delete_booking', {
+      p_booking_id: bookingId,
+      p_password: managePassword
+    });
     if (error) {
       alert('ลบไม่สำเร็จ: ' + error.message);
+    } else if (data === false) {
+      alert('ลบไม่สำเร็จ: รหัสผ่านผู้ดูแลไม่ถูกต้อง');
     } else {
       fetchBookings(); // อัปเดตตารางใหม่
     }
@@ -158,9 +169,13 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
   const handleCancelBookingByDesk = async (deskLabel: string, silent: boolean = false) => {
     if (!silent && !confirm(`ยืนยันที่จะยกเลิกการจองของโต๊ะ ${deskLabel} ใช่หรือไม่?`)) return false;
     
-    const { error } = await supabase.from('bookings').delete().eq('room_id', room.id).eq('desk_id', deskLabel);
-    if (error) {
-      alert('ยกเลิกไม่สำเร็จ: ' + error.message);
+    const { data, error } = await supabase.rpc('admin_delete_booking_by_desk', {
+      p_room_id: room.id,
+      p_desk_id: deskLabel,
+      p_password: managePassword
+    });
+    if (error || data === false) {
+      alert('ยกเลิกไม่สำเร็จ: ' + (error?.message || 'รหัสผ่านผู้ดูแลไม่ถูกต้อง'));
       return false;
     } else {
       fetchBookings();
