@@ -34,6 +34,7 @@ function BookingContent({ roomId }: { roomId: string }) {
   useEffect(() => {
     let channel: any;
     let intervalId: NodeJS.Timeout;
+    let handleVisibilityChange: () => void;
 
     const fetchData = async () => {
       const { data: roomData } = await supabase.from('rooms').select('*').or(`id.eq.${roomId},join_code.eq.${roomId.toUpperCase()}`).maybeSingle();
@@ -61,6 +62,17 @@ function BookingContent({ roomId }: { roomId: string }) {
         } else {
           // ระบบ Smart Polling ดึงข้อมูลใหม่เป็นรอบๆ ตามเวลาที่ตั้งไว้
           intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+          
+          // หยุดดึงข้อมูลเมื่อผู้ใช้พับหน้าจอหรือสลับแท็บเบราว์เซอร์ (ช่วยลด Egress มหาศาล)
+          handleVisibilityChange = () => {
+            if (document.hidden) {
+              clearInterval(intervalId);
+            } else {
+              fetchBookings(); // ดึงข้อมูลอัปเดตทันทีที่สลับกลับมาดู
+              intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibilityChange);
         }
       }
       setLoading(false);
@@ -70,6 +82,7 @@ function BookingContent({ roomId }: { roomId: string }) {
     return () => {
       if (channel) supabase.removeChannel(channel);
       if (intervalId) clearInterval(intervalId);
+      if (handleVisibilityChange) document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [roomId]);
 

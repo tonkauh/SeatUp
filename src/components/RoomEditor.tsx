@@ -48,6 +48,7 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
 
     let channel: any;
     let intervalId: NodeJS.Timeout;
+    let handleVisibilityChange: () => void;
 
     if (USE_REALTIME) {
       // เปิดใช้งาน Supabase Realtime สำหรับหน้า Dashboard แอดมิน
@@ -63,11 +64,23 @@ export default function RoomEditor({ room, onDataChange, onGoHome }: { room: any
     } else {
       // ระบบ Smart Polling
       intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+      
+      // หยุดดึงข้อมูลเมื่อผู้ใช้พับหน้าจอหรือสลับแท็บ
+      handleVisibilityChange = () => {
+        if (document.hidden) {
+          clearInterval(intervalId);
+        } else {
+          fetchBookings();
+          intervalId = setInterval(fetchBookings, POLLING_INTERVAL);
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
       if (channel) supabase.removeChannel(channel);
       if (intervalId) clearInterval(intervalId);
+      if (handleVisibilityChange) document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [room.id]);
 
